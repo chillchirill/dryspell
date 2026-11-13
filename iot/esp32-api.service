@@ -5,8 +5,6 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=exec
-User=esp32-api
-Group=esp32-api
 WorkingDirectory=/opt/esp32-api
 ExecStart=/usr/bin/node /opt/esp32-api/server.js
 Environment=NODE_ENV=production

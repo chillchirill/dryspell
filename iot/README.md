@@ -14,7 +14,8 @@ npm start
 
 ## Запуск на Linux і логи
 
-Потрібні встановлені Node.js і npm. Скопіюй папку `iot` на Linux без `node_modules`.
+Потрібні встановлені Node.js і npm (для сервера рекомендовано Node.js 24 LTS).
+Скопіюй папку `iot` на Linux без `node_modules`.
 Заміни `/path/to/iot` на свій шлях:
 
 ```bash
@@ -46,6 +47,135 @@ curl 'http://localhost:2500/api/esp32?device=esp32' \
   -d '{"temperature":24.5,"humidity":60}'
 ```
 
+## Ubuntu: автозапуск через systemd
+
+Готовий файл служби: [`esp32-api.service`](esp32-api.service).
+Нижче використано шлях `/opt/esp32-api`. Окремого користувача створювати не потрібно:
+у файлі немає `User=` і `Group=`, тому системна служба запускається від `root`
+(не від користувача поточного SSH-сеансу).
+Служба запускається під час завантаження Ubuntu, перезапускається після збою
+через 5 секунд і записує логи в journal та `/opt/esp32-api/logs/esp32.log`.
+
+HTTP та WebSocket уже працюють через один сервер на **`0.0.0.0:2500`**:
+
+- HTTP API: `http://SERVER_IP:2500/api/esp32`;
+- сторінка логів: `http://SERVER_IP:2500/`;
+- WebSocket: `ws://SERVER_IP:2500/ws`.
+
+Заміни `SERVER_IP` на публічну IPv4-адресу сервера. Окремий порт для WS не потрібен.
+
+### 1. Встанови Node.js
+
+Якщо Node.js 24 уже встановлений системно, пропусти встановлення. Інакше встанови
+його з репозиторію [NodeSource](https://github.com/nodesource/distributions/blob/master/DEV_README.md):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl git
+curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/esp32-nodesource-setup.sh
+sudo bash /tmp/esp32-nodesource-setup.sh
+sudo apt-get install -y nodejs
+/usr/bin/node --version
+/usr/bin/npm --version
+```
+
+Файл служби використовує `/usr/bin/node`. Якщо системний Node.js установлений,
+наприклад, у `/usr/local/bin/node`, зміни `ExecStart` у файлі служби перед копіюванням.
+Node.js із `nvm` у домашній папці користувача цій службі недоступний через `ProtectHome=true`;
+для наведеного налаштування потрібна системна інсталяція.
+Підтримувані версії: [Node.js Releases](https://nodejs.org/en/about/previous-releases).
+
+### 2. Розмісти проєкт
+
+Склонуй [репозиторій dryspell](https://github.com/chillchirill/dryspell) на Ubuntu.
+Якщо він уже є у `~/dryspell`, пропусти `git clone`.
+Залежності встановлюй на самому сервері; Windows-папку `node_modules` переносити не потрібно.
+
+```bash
+git clone https://github.com/chillchirill/dryspell.git ~/dryspell
+cd ~/dryspell/iot
+npm ci --omit=dev
+
+sudo install -d -m 0755 /opt/esp32-api
+sudo install -m 0644 server.js package.json package-lock.json /opt/esp32-api/
+sudo cp -R static node_modules /opt/esp32-api/
+sudo chmod -R a+rX /opt/esp32-api/static /opt/esp32-api/node_modules
+sudo install -d -m 0750 /opt/esp32-api/logs
+```
+
+Папка `logs` має існувати до запуску служби. Це дозволений для запису шлях
+при `ProtectSystem=strict`; код і залежності належать `root`.
+
+### 3. Установи й запусти службу
+
+З папки `~/dryspell/iot` виконай:
+
+```bash
+sudo install -m 0644 esp32-api.service /etc/systemd/system/esp32-api.service
+sudo systemd-analyze verify /etc/systemd/system/esp32-api.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now esp32-api
+sudo systemctl restart esp32-api
+sudo systemctl status esp32-api --no-pager
+```
+
+`restart` застосовує оновлений файл служби, якщо вона вже була запущена.
+
+Якщо раніше запускав `npm start`, зупини той процес перед запуском служби,
+щоб звільнити порт 2500. Для зміни шляху проєкту узгоджено зміни
+`WorkingDirectory`, шлях до `server.js` в `ExecStart` і `ReadWritePaths`.
+Параметри служби описані в [документації systemd](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html).
+
+### 4. Дозволь вхідні підключення на TCP 2500
+
+Якщо на сервері використовується UFW:
+
+```bash
+sudo ufw allow 2500/tcp
+sudo ufw status
+```
+
+Якщо UFW показує `inactive`, він зараз не фільтрує трафік. Для відкриття цього
+порту вмикати його не потрібно. Також дозволь **вхідний TCP 2500** у firewall / security group
+панелі хостингу. Для сервера за роутером потрібне перенаправлення TCP 2500 на цей сервер.
+Правила UFW: [документація Ubuntu](https://ubuntu.com/server/docs/how-to/security/firewalls/).
+
+### 5. Перевір HTTP і WebSocket
+
+На сервері:
+
+```bash
+sudo ss -ltnp 'sport = :2500'
+curl --fail 'http://127.0.0.1:2500/api/esp32?device=test&temperature=24.5'
+```
+
+Має бути прослуховування `0.0.0.0:2500` та JSON-відповідь з `ok: true`.
+На іншому комп'ютері відкрий `http://SERVER_IP:2500/`: статус має стати `Connected`.
+Залиш сторінку відкритою та надішли запит з іншого термінала:
+
+```bash
+curl --fail 'http://SERVER_IP:2500/api/esp32?device=test' \
+  -H 'Content-Type: application/json' \
+  -d '{"temperature":24.5,"humidity":60}'
+```
+
+Новий JSON-запис має з'явитися у браузері без оновлення сторінки — це перевіряє
+доставку через WebSocket. На Windows використовуй `curl.exe` замість `curl`.
+Пряме підключення до цього сервера використовує `http://` та `ws://`.
+Для `https://` / `wss://` потрібен TLS, наприклад reverse proxy з підтримкою
+WebSocket Upgrade; сам `.service` файл HTTPS не додає.
+
+Керування службою й перегляд логів:
+
+```bash
+sudo journalctl -u esp32-api -n 100 -f
+sudo systemctl restart esp32-api
+sudo systemctl stop esp32-api
+```
+
+`Ctrl+C` під час перегляду journal зупиняє лише перегляд логів.
+Після оновлення файлів проєкту в `/opt/esp32-api` перезапускай саме службу.
+
 ## Живі логи у браузері
 
 Відкрий `http://localhost:2500/` на комп'ютері із сервером або
@@ -70,7 +200,9 @@ Broadcast stateless: без сесій, підписок за ID, історії
 для відновлення потоку після підключення.
 Пропущені під час відключення записи автоматично не відтворюються — вони залишаються у файлі.
 
-Після оновлення на Linux виконай `npm ci` та перезапусти сервер через `npm start`.
+Після оновлення при ручному запуску на Linux виконай `npm ci` та перезапусти сервер
+через `npm start`. Для systemd використовуй `sudo systemctl restart esp32-api`
+після оновлення розгорнутих файлів і залежностей.
 
 ## Запити
 
