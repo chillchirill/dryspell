@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wildfire Outlook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg:#0b0d12; --panel:rgba(17,20,28,.82); --line:rgba(255,255,255,.08); --fg:#f1f3f7; --muted:#8b93a7;
+  --chip:rgba(255,255,255,.06); --chip-on:rgba(255,255,255,.14); --accent:#ff7a1a; --shadow:0 10px 40px rgba(0,0,0,.45);
+}
+body.light {
+  --bg:#eef0f4; --panel:rgba(255,255,255,.86); --line:rgba(15,23,42,.09); --fg:#111827; --muted:#5b6475;
+  --chip:rgba(15,23,42,.05); --chip-on:rgba(15,23,42,.11); --shadow:0 10px 40px rgba(15,23,42,.18);
+}
+* { box-sizing:border-box; }
+html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+  font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+#map { position:absolute; inset:0; background:var(--bg); }
+
+.panel { position:absolute; z-index:1000; top:16px; left:16px; width:340px; max-height:calc(100% - 32px);
+  display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:18px;
+  box-shadow:var(--shadow); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
+  transition:background .25s; }
+.head { display:flex; gap:12px; align-items:center; padding:16px 16px 12px; }
+.logo { flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
+  background:linear-gradient(140deg,#ffcf3d,#ff6a00 55%,#c3141f); box-shadow:0 4px 18px rgba(255,106,0,.45); }
+.head h1 { margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
+.head .sub { color:var(--muted); font-size:12px; }
+.collapse { margin-left:auto; flex:none; width:30px; height:30px; border:0; border-radius:9px; cursor:pointer;
+  background:var(--chip); color:var(--fg); display:grid; place-items:center; }
+.collapse svg { transition:transform .2s; }
+.panel.closed .collapse svg { transform:rotate(180deg); }
+.panel.closed .body { display:none; }
+.body { overflow-y:auto; padding:0 16px 16px; scrollbar-width:thin; }
+
+.window { display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:12px; background:var(--chip);
+  font-size:12px; font-variant-numeric:tabular-nums; }
+.window .dot { width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.2); }
+
+.stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.stat { padding:10px 12px; border-radius:12px; background:var(--chip); }
+.stat b { display:block; font-size:19px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.stat span { color:var(--muted); font-size:11px; }
+
+.sec { margin-top:16px; }
+.sec-title { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;
+  font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.badge { font-size:13px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--fg);
+  padding:2px 9px; border-radius:999px; background:var(--chip-on); font-variant-numeric:tabular-nums; }
+
+input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:999px; margin:6px 0;
+  outline:none; cursor:pointer; background:var(--chip-on); }
+input[type=range].heat { background:linear-gradient(90deg,#fde68a,#fbbf24 30%,#f97316 55%,#dc2626 78%,#7f1d1d); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+  background:#fff; border:3px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.35); }
+input[type=range]::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#fff;
+  border:3px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.35); }
+input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 4px rgba(255,122,26,.35); }
+.ticks { display:flex; justify-content:space-between; color:var(--muted); font-size:10.5px; font-variant-numeric:tabular-nums; }
+
+.seg { display:flex; padding:3px; border-radius:11px; background:var(--chip); gap:2px; }
+.seg button { flex:1; border:0; background:none; color:var(--muted); font:inherit; font-weight:500; padding:6px 4px;
+  border-radius:8px; cursor:pointer; transition:background .15s,color .15s; }
+.seg button:hover { color:var(--fg); }
+.seg button.on { background:var(--chip-on); color:var(--fg); box-shadow:0 1px 3px rgba(0,0,0,.15); }
+
+.row { display:flex; align-items:center; gap:10px; margin-top:10px; }
+.row label { flex:none; width:64px; color:var(--muted); font-size:12px; }
+.toggles { display:grid; gap:2px; margin-top:8px; }
+.toggle { display:flex; align-items:center; gap:10px; padding:7px 4px; cursor:pointer; user-select:none; }
+.toggle input { display:none; }
+.switch { flex:none; width:30px; height:18px; border-radius:999px; background:var(--chip-on); position:relative; transition:background .2s; }
+.switch::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .2s; }
+.toggle input:checked + .switch { background:var(--accent); }
+.toggle input:checked + .switch::after { transform:translateX(12px); }
+.toggle small { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+.legend-classes { display:grid; gap:4px; }
+.lg { display:flex; align-items:center; gap:9px; font-size:12px; }
+.lg i { width:12px; height:12px; border-radius:4px; flex:none; }
+.lg em { font-style:normal; color:var(--muted); }
+.lg small { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
+.bar { height:10px; border-radius:999px; background:linear-gradient(90deg,#fde68a,#fbbf24 30%,#f97316 55%,#dc2626 78%,#7f1d1d); }
+.note { color:var(--muted); font-size:11.5px; margin-top:8px; }
+.note span { display:inline-block; width:10px; height:10px; border:1.5px solid var(--fg); border-radius:2px; vertical-align:-1px; margin-right:4px; }
+.note b { display:inline-block; width:6px; height:6px; border-radius:50%; background:#22d3ee; vertical-align:1px; margin:0 4px 0 8px; }
+
+.countries { display:grid; gap:2px; }
+.country { display:grid; grid-template-columns:1fr auto; gap:2px 10px; padding:7px 8px; border-radius:9px;
+  cursor:pointer; border:0; background:none; color:inherit; font:inherit; text-align:left; }
+.country:hover { background:var(--chip); }
+.country .meter { grid-column:1/-1; height:3px; border-radius:2px; background:var(--chip-on); overflow:hidden; }
+.country .meter div { height:100%; border-radius:2px; background:linear-gradient(90deg,#fbbf24,#ef4444); }
+.country small { color:var(--muted); font-variant-numeric:tabular-nums; }
+
+details { margin-top:16px; border-top:1px solid var(--line); padding-top:12px; }
+summary { cursor:pointer; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+details table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
+details td { padding:3px 0; } details td:last-child { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+details td:first-child { color:var(--muted); }
+
+/* Leaflet chrome */
+.leaflet-control-zoom a { background:var(--panel)!important; color:var(--fg)!important; border-color:var(--line)!important;
+  backdrop-filter:blur(12px); }
+.leaflet-bar { border:1px solid var(--line)!important; border-radius:12px!important; overflow:hidden; box-shadow:var(--shadow)!important; }
+.leaflet-control-attribution { background:var(--panel)!important; color:var(--muted)!important; border-radius:8px 0 0 0; }
+.leaflet-control-attribution a { color:var(--muted)!important; }
+.leaflet-popup-content-wrapper { background:var(--panel); color:var(--fg); border-radius:16px; border:1px solid var(--line);
+  box-shadow:var(--shadow); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+.leaflet-popup-tip { background:var(--panel); }
+.leaflet-popup-content { margin:14px 16px; font:13px/1.45 Inter,system-ui,sans-serif; min-width:220px; }
+.leaflet-container a.leaflet-popup-close-button { color:var(--muted); }
+.pop-top { display:flex; align-items:baseline; gap:8px; }
+.pop-top b { font-size:26px; font-weight:700; letter-spacing:-.03em; }
+.pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; color:#111; }
+.pop-place { color:var(--muted); font-size:12px; margin:2px 0 8px; }
+.pop-bar { height:5px; border-radius:999px; background:var(--chip-on); overflow:hidden; margin-bottom:10px; }
+.pop-bar div { height:100%; border-radius:999px; }
+.pop-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.pop-grid div { background:var(--chip); border-radius:9px; padding:6px 8px; }
+.pop-grid span { display:block; color:var(--muted); font-size:10.5px; }
+.pop-grid strong { font-variant-numeric:tabular-nums; }
+.pop-flag { margin-top:8px; padding:6px 8px; border-radius:9px; font-size:12px; background:rgba(255,122,26,.14); color:var(--accent); }
+
+@media (max-width:640px) {
+  .panel { top:auto; bottom:10px; left:10px; right:10px; width:auto; max-height:58vh; }
+  .leaflet-bottom.leaflet-right { bottom:auto; top:0; }
+}
+</style></head>
+<body>
+<div id="map"></div>
+
+<aside class="panel" id="panel">
+  <div class="head">
+    <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2c.6 3.2-1 5.2-2.6 7C7.8 10.8 6 12.8 6 15.5A6 6 0 0 0 12 22a6 6 0 0 0 6-6.3c0-2.5-1.3-4.3-2.4-5.6-.2 1.6-.9 2.8-2.1 3.4.5-3.6-.3-8.6-1.5-11.5Z"/></svg></div>
+    <div><h1>Wildfire outlook</h1><div class="sub">Next 24 h &middot; NASA FIRMS + NOAA GFS</div></div>
+    <button class="collapse" id="collapse" aria-label="Collapse panel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
+  </div>
+  <div class="body">
+    <div class="window"><span class="dot"></span><span id="valid"></span></div>
+
+    <div class="stats">
+      <div class="stat"><b id="sCells">–</b><span>cells shown</span></div>
+      <div class="stat"><b id="sExp">–</b><span>expected to burn</span></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span>Min. probability</span><span class="badge" id="thrVal">1%</span></div>
+      <input type="range" id="thr" class="heat" min="0" max="15" step="1" value="0" aria-label="Minimum fire probability">
+      <div class="ticks"><span>1%</span><span>10%</span><span>40%</span><span>90%</span></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span>Display</span></div>
+      <div class="seg" id="mode">
+        <button data-v="classes">Risk classes</button><button data-v="gradient">Gradient</button>
+      </div>
+      <div class="row"><label for="op">Opacity</label><input type="range" id="op" min="15" max="100" value="75"></div>
+      <div class="row"><label>Basemap</label>
+        <div class="seg" id="base" style="flex:1"><button data-v="dark">Dark</button><button data-v="light">Light</button><button data-v="satellite">Satellite</button></div>
+      </div>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="fresh"><span class="switch"></span>New ignitions only<small id="nFresh"></small></label>
+        <label class="toggle"><input type="checkbox" id="dets"><span class="switch"></span>Detections, last 24 h<small id="nDets"></small></label>
+        <label class="toggle"><input type="checkbox" id="borders" checked><span class="switch"></span>Country borders</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span>Legend</span></div>
+      <div id="legend"></div>
+      <div class="note"><span></span>new-ignition risk (no fire within ~1&deg; this week)<b></b>detection</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title"><span>Top countries</span><span style="text-transform:none;letter-spacing:0">expected cells</span></div>
+      <div class="countries" id="countries"></div>
+    </div>
+
+    <details>
+      <summary>Model &amp; data</summary>
+      <table id="meta"></table>
+    </details>
+  </div>
+</aside>
+
+<script>
+const C = __CELLS__;
+const P = __PTS__;
+const B = __BORDERS__;
+const META = __META__;
+const RISK = __COLORS__;
+const RES = __RES__, H = RES / 2;
+const STEPS = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90];
+const CLASS_RANGE = {"Low": "< 10%", "Moderate": "10–30%", "High": "30–60%", "Very high": "≥ 60%"};
+const BASES = {
+  dark: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+         'Tiles &copy; Esri', 'dark'],
+  light: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+          'Tiles &copy; Esri', 'light'],
+  satellite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+              'Tiles &copy; Esri, Maxar, Earthstar Geographics', 'dark'],
+};
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const pct = p => (p * 100 >= 10 ? (p * 100).toFixed(0) : (p * 100).toFixed(1)) + '%';
+
+// ---- state (remembered per browser) -------------------------------------------------
+const state = {step: 0, mode: 'classes', opacity: 75, base: 'dark', fresh: false, dets: false, borders: true,
+               open: !matchMedia('(max-width:640px)').matches};
+try { Object.assign(state, JSON.parse(localStorage.getItem('wildfireMap') || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem('wildfireMap', JSON.stringify(state)); } catch (e) {} };
+
+// ---- colour ramp (log scale, 1% .. 100%) --------------------------------------------
+const STOPS = [[0, [253, 230, 138]], [.3, [251, 191, 36]], [.55, [249, 115, 22]], [.78, [220, 38, 38]], [1, [127, 29, 29]]];
+function ramp(p) {
+  const t = Math.max(0, Math.min(1, Math.log(p / 0.01) / Math.log(100)));
+  for (let i = 1; i < STOPS.length; i++) if (t <= STOPS[i][0]) {
+    const [t0, a] = STOPS[i - 1], [t1, b] = STOPS[i], f = (t - t0) / (t1 - t0);
+    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')})`;
+  }
+  return 'rgb(127,29,29)';
+}
+
+// ---- data --------------------------------------------------------------------------
+const cells = C.map((r, i) => ({i, lat: r[0], lon: r[1], p: r[2], cls: r[3], country: r[4], det: r[5], fresh: !!r[6],
+  tmax: r[7], rh: r[8], wind: r[9], rain7: r[10], dsr: r[11], grad: ramp(r[2]), rect: null, on: false}))
+  .sort((a, b) => b.p - a.p);
+
+// ---- map ---------------------------------------------------------------------------
+const map = L.map('map', {preferCanvas: true, worldCopyJump: true, zoomControl: false, minZoom: 2}).setView([18, 12], 3);
+L.control.zoom({position: 'bottomright'}).addTo(map);
+const renderer = L.canvas({padding: 0.4, tolerance: 2});
+// Cells get their own pane: they are drawn opaque and slightly overlapping, and the pane as a whole is
+// made translucent, so there are no hairline seams between neighbouring cells at any zoom or DPI.
+map.createPane('cells').style.zIndex = 390;
+const cellRenderer = L.canvas({padding: 0.4, tolerance: 1, pane: 'cells'});
+const credit = ' | Fire data: NASA FIRMS | Weather: NOAA GFS';
+let baseLayer = null;
+const borderLine = L.polyline(B, {weight: 0.7, interactive: false, renderer});
+const cellGroup = L.featureGroup().addTo(map);
+const detGroup = L.featureGroup();
+P.forEach(p => L.circleMarker([p[0], p[1]], {renderer, radius: 2, weight: 0, fillOpacity: .85, frp: p[2]}).addTo(detGroup));
+
+const theme = () => BASES[state.base][2];
+const outline = () => theme() === 'dark' ? '#ffffff' : '#111827';
+
+function styleOf(c) {
+  return {
+    fillColor: state.mode === 'classes' ? RISK[c.cls] : c.grad, fillOpacity: 1,
+    stroke: c.fresh, color: outline(), weight: 1, opacity: 0.9,
+  };
+}
+// Push cell corners outwards to whole pixels: neighbours overlap by < 1 px instead of leaving a gap.
+const Cell = L.Rectangle.extend({
+  _project() {
+    L.Rectangle.prototype._project.call(this);
+    for (const ring of this._rings) {
+      const xs = ring.map(p => p.x), ys = ring.map(p => p.y);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      for (const p of ring) { p.x = p.x < cx ? Math.floor(p.x) : Math.ceil(p.x); p.y = p.y < cy ? Math.floor(p.y) : Math.ceil(p.y); }
+    }
+  },
+});
+const applyOpacity = () => { map.getPane('cells').style.opacity = state.opacity / 100; };
+function rectOf(c) {
+  if (!c.rect) c.rect = new Cell([[c.lat - H, c.lon - H], [c.lat + H, c.lon + H]], {renderer: cellRenderer, i: c.i, ...styleOf(c)});
+  return c.rect;
+}
+const eligible = c => c.p >= STEPS[state.step] / 100 && (!state.fresh || c.fresh);
+
+// Add/remove only the cells whose visibility changed; restyle visible ones when asked.
+function sync(restyle) {
+  for (const c of cells) {
+    const want = eligible(c);
+    if (want && !c.on) { rectOf(c).setStyle(styleOf(c)); cellGroup.addLayer(c.rect); c.on = true; }
+    else if (!want && c.on) { cellGroup.removeLayer(c.rect); c.on = false; }
+    else if (want && restyle) c.rect.setStyle(styleOf(c));
+  }
+  updateStats();
+}
+
+// ---- side panel --------------------------------------------------------------------
+function updateStats() {
+  let n = 0, exp = 0;
+  const byCls = {}, byCountry = new Map();
+  for (const c of cells) if (c.on) {
+    n++; exp += c.p; byCls[c.cls] = (byCls[c.cls] || 0) + 1;
+    let k = byCountry.get(c.country);
+    if (!k) byCountry.set(c.country, k = {e: 0, n: 0, s: 90, w: 180, nn: -90, ee: -180});
+    k.e += c.p; k.n++; k.s = Math.min(k.s, c.lat); k.nn = Math.max(k.nn, c.lat); k.w = Math.min(k.w, c.lon); k.ee = Math.max(k.ee, c.lon);
+  }
+  $('sCells').textContent = fmt(n);
+  $('sExp').textContent = fmt(exp);
+  $('thrVal').textContent = '≥ ' + STEPS[state.step] + '%';
+  renderLegend(byCls);
+  const top = [...byCountry].filter(([k]) => k && k !== 'Ocean / unassigned').sort((a, b) => b[1].e - a[1].e).slice(0, 7);
+  const max = top.length ? top[0][1].e : 1;
+  $('countries').innerHTML = top.map(([name, k], j) =>
+    `<button class="country" data-j="${j}"><span>${name}</span><small>${fmt(k.e)} &middot; ${fmt(k.n)} cells</small>` +
+    `<span class="meter"><div style="width:${(100 * k.e / max).toFixed(1)}%"></div></span></button>`).join('') ||
+    '<div class="note">No cells above this threshold.</div>';
+  $('countries').querySelectorAll('.country').forEach(el => el.onclick = () => {
+    const k = top[+el.dataset.j][1];
+    map.flyToBounds([[k.s - H, k.w - H], [k.nn + H, k.ee + H]], {padding: [40, 40], maxZoom: 7, duration: 1.1});
+  });
+}
+
+function renderLegend(byCls) {
+  if (state.mode === 'classes') {
+    $('legend').innerHTML = '<div class="legend-classes">' + Object.keys(RISK).slice().reverse().map(k =>
+      `<div class="lg"><i style="background:${RISK[k]}"></i>${k} <em>${CLASS_RANGE[k] || ''}</em><small>${fmt(byCls[k] || 0)}</small></div>`
+    ).join('') + '</div>';
+  } else {
+    $('legend').innerHTML = '<div class="bar"></div><div class="ticks" style="margin-top:5px"><span>1%</span><span>3%</span><span>10%</span><span>30%</span><span>100%</span></div>';
+  }
+}
+
+function setSeg(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
+
+function applyBase() {
+  if (baseLayer) map.removeLayer(baseLayer);
+  const [url, attr] = BASES[state.base];
+  baseLayer = L.tileLayer(url, {maxZoom: 18, maxNativeZoom: 16, attribution: attr + credit}).addTo(map);
+  baseLayer.bringToBack();
+  document.body.classList.toggle('light', theme() === 'light');
+  borderLine.setStyle({color: theme() === 'dark' ? '#ffffff' : '#334155', opacity: theme() === 'dark' ? 0.28 : 0.35});
+  detGroup.setStyle({fillColor: theme() === 'dark' ? '#22d3ee' : '#0e7490'});
+  setSeg('base', state.base);
+}
+function applyOverlays() {
+  state.borders ? borderLine.addTo(map) : map.removeLayer(borderLine);
+  state.dets ? detGroup.addTo(map) : map.removeLayer(detGroup);
+  if (state.borders) borderLine.bringToBack();
+}
+
+// ---- popups & hover ----------------------------------------------------------------
+const byIdx = []; cells.forEach(c => byIdx[c.i] = c);
+cellGroup.on('click', e => {
+  const c = byIdx[e.layer.options.i];
+  const col = RISK[c.cls];
+  const ns = c.lat >= 0 ? 'N' : 'S', ew = c.lon >= 0 ? 'E' : 'W';
+  L.popup({maxWidth: 300}).setLatLng(e.latlng).setContent(`
+    <div class="pop-top"><b>${pct(c.p)}</b><span class="pill" style="background:${col};color:${c.cls === 'Low' ? '#111' : '#fff'}">${c.cls}</span></div>
+    <div class="pop-place">${c.country || 'Unassigned'} &middot; ${Math.abs(c.lat).toFixed(2)}°${ns}, ${Math.abs(c.lon).toFixed(2)}°${ew}</div>
+    <div class="pop-bar"><div style="width:${Math.max(2, c.p * 100)}%;background:${c.grad}"></div></div>
+    <div class="pop-grid">
+      <div><span>Max temperature</span><strong>${c.tmax.toFixed(1)} °C</strong></div>
+      <div><span>Min humidity</span><strong>${c.rh.toFixed(0)}%</strong></div>
+      <div><span>Max wind</span><strong>${c.wind.toFixed(1)} m/s</strong></div>
+      <div><span>Rain, last 7 days</span><strong>${c.rain7.toFixed(1)} mm</strong></div>
+      <div><span>Days since rain</span><strong>${c.dsr}</strong></div>
+      <div><span>Detections, 24 h</span><strong>${c.det}</strong></div>
+    </div>
+    ${c.fresh ? '<div class="pop-flag">New-ignition risk: no fire nearby this week</div>' : ''}`).openOn(map);
+});
+cellGroup.on('mouseover', e => e.layer.setStyle({stroke: true, color: outline(), weight: 2, opacity: 1}));
+cellGroup.on('mouseout', e => e.layer.setStyle(styleOf(byIdx[e.layer.options.i])));
+detGroup.on('click', e => L.popup().setLatLng(e.latlng)
+  .setContent(`<b>Fire detection</b><div class="pop-place">Fire radiative power ${e.layer.options.frp} MW</div>`).openOn(map));
+
+// ---- wiring ------------------------------------------------------------------------
+let pending = false;
+$('thr').oninput = e => { state.step = +e.target.value; $('thrVal').textContent = '≥ ' + STEPS[state.step] + '%';
+  if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; sync(false); save(); }); } };
+$('op').oninput = e => { state.opacity = +e.target.value; applyOpacity(); save(); };
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => { state.mode = b.dataset.v; setSeg('mode', state.mode); sync(true); save(); });
+document.querySelectorAll('#base button').forEach(b => b.onclick = () => { state.base = b.dataset.v; applyBase(); sync(true); save(); });
+$('fresh').onchange = e => { state.fresh = e.target.checked; sync(false); save(); };
+$('dets').onchange = e => { state.dets = e.target.checked; applyOverlays(); save(); };
+$('borders').onchange = e => { state.borders = e.target.checked; applyOverlays(); save(); };
+$('collapse').onclick = () => { state.open = !state.open; $('panel').classList.toggle('closed', !state.open); save(); };
+
+// ---- init --------------------------------------------------------------------------
+state.step = Math.max(0, Math.min(STEPS.length - 1, state.step | 0));
+$('thr').value = state.step; $('op').value = state.opacity;
+$('fresh').checked = state.fresh; $('dets').checked = state.dets; $('borders').checked = state.borders;
+$('panel').classList.toggle('closed', !state.open);
+setSeg('mode', state.mode);
+$('valid').textContent = META.valid;
+$('nFresh').textContent = fmt(cells.filter(c => c.fresh).length);
+$('nDets').textContent = fmt(P.length);
+$('meta').innerHTML = META.rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+applyBase(); applyOverlays(); applyOpacity(); sync(false);
+</script>
+</body></html>

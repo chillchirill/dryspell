@@ -1,0 +1,8 @@
+.env
+data/
+models/
+output/firms/*.csv
+__pycache__/
+
+.claude/
+output/
