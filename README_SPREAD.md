@@ -1,5 +1,26 @@
 # Spread layer on the existing forecast map
 
+## Quick start
+
+```powershell
+python fire_forecast.py predict      # only if there is no forecast yet (needs a trained model)
+python fire_dashboard.py start       # prepares what is missing, builds the map and serves it
+```
+
+Open http://127.0.0.1:8000/ . `start` needs `output/firms/forecast_latest.csv` and the caches in `data/raw` and
+`data/gfs`. If the wind forecast for the arrows is not cached, it downloads that one file from NOAA GFS (about 4 MB)
+into `data/gfs_uv`; nothing else is downloaded. It also builds the history calendar when
+`output/harmonization_handoff.zip` is present, and the seasons page when `data/climate_months.npz` is present.
+Any Python with the packages from `requirements.txt` works; the `.venv\Scripts\python.exe` paths below are one example.
+
+On the map:
+- The day slider is off by default and never plays by itself. Tick **Next days** to open it; the cross closes it and
+  returns to the next 24 hours.
+- **Go to** changes the view only. **Other views** opens the history calendar, the Ireland simulation and the seasons page.
+- If a view has no squares at the chosen probability, a note says so instead of leaving the map empty.
+
+The sections below describe each part in detail.
+
 Run commands from the repository root with the existing virtual environment:
 
 Prerequisites: the dependencies in `requirements.txt` and locally supplied caches

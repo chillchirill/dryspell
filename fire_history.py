@@ -6,7 +6,6 @@ Country-level scale adjustment is exploratory, not event-level harmonization.
 """
 from __future__ import annotations
 import argparse
-import gzip
 import hashlib
 import io
 import json

@@ -591,7 +591,6 @@ $('meta').innerHTML = META.rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td><
 applyOpen(); buildChips(); buildChart(); applyBase(); applyOverlays();
 setTargets(); Wc.set(Wt);
 requestAnimationFrame(now => { last = now; frame(now); });
-setPlaying(false);
-if (!calm) setTimeout(() => setPlaying(true), 1800);
+setPlaying(false);          // months play only when the user presses Play
 </script>
 </body></html>
