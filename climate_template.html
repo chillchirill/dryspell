@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wildfire seasons</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root { --bg:#e9ebee; --panel:#ffffff; --line:#d9dce1; --fg:#1a1d21; --muted:#646b76; --hover:#f2f3f5; --hot:#d9480f; --cool:#1d6fd0; }
+body.dark { --bg:#0e1013; --panel:#191c20; --line:#30343b; --fg:#eceef1; --muted:#9aa1ac; --hover:#252930; --hot:#ff8a3d; --cool:#6cb4ff; }
+* { box-sizing:border-box; }
+html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+a { color:var(--hot); text-decoration:none; } a:hover { text-decoration:underline; }
+#map { position:absolute; inset:0; background:var(--bg); }
+
+.cells-cv, .cells-glow { position:absolute; left:0; top:0; }
+.cells-glow { filter:blur(7px); mix-blend-mode:screen; animation:breathe 3.4s ease-in-out infinite; }
+body.noglow .cells-glow { display:none; }
+@keyframes breathe { 0%,100% { opacity:.25; } 50% { opacity:.6; } }
+
+.panel { position:absolute; z-index:1000; top:12px; left:12px; width:310px; max-height:calc(100% - 24px);
+  display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,.12); accent-color:var(--hot); }
+.head { display:flex; align-items:flex-start; gap:8px; padding:14px 14px 12px; }
+.head h1 { margin:0; font-size:16px; font-weight:600; }
+.head .sub { color:var(--muted); font-size:12.5px; }
+.collapse { margin-left:auto; flex:none; width:26px; height:26px; border:1px solid var(--line); border-radius:6px;
+  cursor:pointer; background:none; color:var(--fg); font:inherit; line-height:1; }
+.collapse:hover { background:var(--hover); }
+.panel.closed .body { display:none; }
+.body { overflow-y:auto; padding:0 14px 14px; scrollbar-width:thin; }
+.body > section { padding:12px 0; border-top:1px solid var(--line); }
+.body > section:last-child { padding-bottom:0; }
+h2 { margin:0 0 6px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+h2 span { font-weight:400; color:var(--muted); }
+.num { font-variant-numeric:tabular-nums; }
+.hint { color:var(--muted); font-size:12.5px; }
+.big { font-size:15px; }
+.big b { font-weight:600; }
+.up { color:var(--hot); } .down { color:var(--cool); }
+
+input[type=range] { width:100%; margin:4px 0 0; cursor:pointer; }
+.ticks { display:flex; justify-content:space-between; color:var(--muted); font-size:11.5px; font-variant-numeric:tabular-nums; }
+.bar { height:10px; border-radius:2px; margin-bottom:4px; }
+select { width:100%; font:inherit; color:var(--fg); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 6px; }
+.field { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.field > span { flex:none; width:84px; color:var(--muted); font-size:13px; }
+.field select { flex:1; width:auto; }
+.check { display:flex; align-items:center; gap:8px; padding:3px 0; cursor:pointer; }
+.check input { margin:0; width:15px; height:15px; flex:none; }
+.country { display:flex; padding:3px 6px; margin:0 -6px; width:calc(100% + 12px); border:0; border-radius:4px;
+  background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.country:hover { background:var(--hover); }
+.country small { margin-left:auto; color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; }
+.sep { margin:8px 0 2px; font-size:12px; color:var(--muted); }
+details summary { cursor:pointer; font-size:13px; font-weight:600; }
+details > div, details > table { margin-top:8px; }
+table { width:100%; border-collapse:collapse; font-size:12.5px; }
+td { padding:2px 0; vertical-align:top; } td:first-child { color:var(--muted); padding-right:10px; }
+td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+#chart { width:100%; height:auto; display:block; margin-top:4px; }
+.key { display:flex; gap:12px; font-size:12px; color:var(--muted); margin-top:2px; }
+.key i { display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+
+.timebar { position:absolute; z-index:1000; left:346px; right:70px; bottom:22px; pointer-events:none; }
+.tb { pointer-events:auto; max-width:700px; margin:0 auto; display:flex; gap:14px; align-items:center; padding:12px 16px 10px 12px;
+  background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.18); accent-color:var(--hot); }
+.playbtn { flex:none; width:44px; height:44px; border-radius:50%; border:0; cursor:pointer; background:var(--fg); color:var(--panel);
+  display:grid; place-items:center; }
+.playbtn:hover { opacity:.85; }
+.playbtn[hidden] { display:none; }
+.tb-main { flex:1; min-width:0; }
+.tb-top { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.tb-date { font-size:20px; font-weight:600; letter-spacing:-.01em; }
+.tb-sub { color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; }
+.seg { margin-left:auto; display:flex; padding:2px; border-radius:7px; background:var(--hover); border:1px solid var(--line); align-self:center; }
+.seg button { border:0; background:none; color:var(--muted); font:inherit; font-size:12.5px; padding:3px 9px; border-radius:5px; cursor:pointer; }
+.seg button.on { background:var(--panel); color:var(--fg); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+.chips { display:flex; justify-content:space-between; margin-top:2px; }
+.chips button { border:0; background:none; font:inherit; font-size:12px; color:var(--muted); cursor:pointer; padding:2px 3px; border-radius:4px; }
+.chips button:hover { background:var(--hover); }
+.chips button.on { color:var(--fg); font-weight:600; }
+.chips button.now::after { content:""; display:block; height:2px; margin-top:1px; background:var(--hot); border-radius:1px; }
+#time { margin:0; }
+.tb.static #time { display:none; }
+
+body.noscroll-dummy {}
+.leaflet-container { font:inherit; background:var(--bg); }
+.leaflet-container.over-cell { cursor:pointer; }
+.leaflet-bar { border:1px solid var(--line)!important; border-radius:6px!important; box-shadow:0 1px 4px rgba(0,0,0,.12)!important; }
+.leaflet-control-zoom a { background:var(--panel)!important; color:var(--fg)!important; border-color:var(--line)!important; }
+.leaflet-control-attribution { background:var(--panel)!important; color:var(--muted)!important; }
+.leaflet-control-attribution a { color:var(--muted)!important; }
+.leaflet-popup-content-wrapper { background:var(--panel); color:var(--fg); border-radius:8px; border:1px solid var(--line); box-shadow:0 2px 10px rgba(0,0,0,.25); }
+.leaflet-popup-tip { background:var(--panel); }
+.leaflet-popup-content { margin:12px 14px; font-size:13px; line-height:1.45; min-width:250px; }
+.leaflet-container a.leaflet-popup-close-button { color:var(--muted); }
+.pop-p { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+.pop-place { color:var(--muted); margin:2px 0 6px; }
+.pop-months { display:flex; gap:3px; align-items:flex-end; height:64px; margin:6px 0 4px; }
+.pop-months div { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; font-size:10px; color:var(--muted); }
+.pop-months i { display:block; width:100%; border-radius:2px 2px 0 0; min-height:2px; }
+.pop-months div.on { color:var(--fg); font-weight:600; }
+.pop-note { margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
+
+@media (max-width:640px) {
+  .panel { top:auto; bottom:8px; left:8px; right:8px; width:auto; max-height:55vh; }
+  .head { padding:10px 12px; }
+  .timebar { left:8px; right:8px; top:8px; bottom:auto; }
+  .tb { padding:8px 10px 6px 8px; gap:10px; }
+  .playbtn { width:38px; height:38px; }
+  .tb-date { font-size:17px; }
+  .tb-sub { font-size:11.5px; flex-basis:100%; order:3; }
+  .chips button { font-size:10.5px; padding:2px 1px; }
+  .leaflet-control-zoom { display:none; }
+  .leaflet-bottom.leaflet-right { bottom:72px; }
+  .leaflet-control-attribution { font-size:9px; }
+}
+@media (prefers-reduced-motion:reduce) { .cells-glow { animation:none; } }
+</style></head>
+<body class="dark">
+<div id="map"></div>
+
+<aside class="panel" id="panel">
+  <div class="head">
+    <div><h1>Wildfire seasons</h1><div class="sub"><a href="forecast_map.html">&larr; Next 4 days</a></div></div>
+    <button class="collapse" id="collapse" aria-label="Hide or show the panel">&minus;</button>
+  </div>
+  <div class="body">
+    <section>
+      <div class="big" id="headline"></div>
+      <div class="hint" id="headSub"></div>
+    </section>
+
+    <section>
+      <h2>Show</h2>
+      <select id="layer" aria-label="What to show"></select>
+      <div class="hint" id="layerNote" style="margin-top:6px"></div>
+    </section>
+
+    <section>
+      <h2><span id="thrLabel" style="color:var(--fg);font-weight:600"></span><span class="num" id="thrVal"></span></h2>
+      <input type="range" id="thr" min="0" max="9" step="1" value="0" aria-label="Threshold">
+      <div id="legend" style="margin-top:8px"></div>
+    </section>
+
+    <section>
+      <h2>Fire through the year <span>global</span></h2>
+      <svg id="chart" viewBox="0 0 280 96" role="img" aria-label="Fire activity by month"></svg>
+      <div class="key" id="chartKey"></div>
+      <div class="hint" id="trend" style="margin-top:6px"></div>
+    </section>
+
+    <section>
+      <h2><span id="ctTitle" style="color:var(--fg);font-weight:600">Top countries</span><span id="ctUnit">squares on fire</span></h2>
+      <div id="countries"></div>
+    </section>
+
+    <section>
+      <details>
+        <summary>Map settings</summary>
+        <div>
+          <label class="field"><span>Background</span>
+            <select id="base"><option value="dark">Dark</option><option value="light">Light</option><option value="satellite">Satellite</option></select></label>
+          <label class="field"><span>Opacity</span><input type="range" id="op" min="15" max="100" value="90"></label>
+          <label class="check"><input type="checkbox" id="glow" checked>Glow on strong areas</label>
+          <label class="check"><input type="checkbox" id="borders" checked>Country borders</label>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <details>
+        <summary>About these numbers</summary>
+        <div class="hint" style="margin-top:8px">
+          Each square shows how often it has a fire seen by satellite (NASA VIIRS) on a day of that month,
+          averaged over the last two years. It is the usual pattern of the season, not a weather forecast.
+          Two years show the rhythm of the year and a first look at change; they are too short for a long climate trend.
+        </div>
+        <table id="meta"></table>
+      </details>
+    </section>
+  </div>
+</aside>
+
+<div class="timebar" id="timebar"><div class="tb">
+  <button class="playbtn" id="play" aria-label="Play or pause"></button>
+  <div class="tb-main">
+    <div class="tb-top"><span class="tb-date" id="tbDate"></span><span class="tb-sub" id="tbSub"></span>
+      <div class="seg" id="view"><button data-v="month">Months</button><button data-v="season">Seasons</button><button data-v="year">Year</button></div></div>
+    <input type="range" id="time" min="0" max="1199" value="0" aria-label="Month">
+    <div class="chips" id="chips"></div>
+  </div>
+</div></div>
+
+<script>
+const D = __DATA__;
+const B = __BORDERS__;
+const META = __META__;
+const RES = __RES__, H = RES / 2;
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONF = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SEASONS = [['Dec–Feb', [11, 0, 1], 'northern winter'], ['Mar–May', [2, 3, 4], 'northern spring'],
+                 ['Jun–Aug', [5, 6, 7], 'northern summer'], ['Sep–Nov', [8, 9, 10], 'northern autumn']];
+const STEPS = [1, 2, 3, 5, 7, 10, 15, 20, 30, 50];
+const BASES = {
+  dark: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', 'Tiles &copy; Esri', 'dark'],
+  light: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', 'Tiles &copy; Esri', 'light'],
+  satellite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 'Tiles &copy; Esri, Maxar, Earthstar Geographics', 'dark'],
+};
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const sgn = n => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
+const pct = p => (p * 100 >= 10 ? (p * 100).toFixed(0) : (p * 100).toFixed(1)) + '%';
+const phone = matchMedia('(max-width:640px)');
+const calm = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+const state = {step: 0, layer: 'typical', opacity: 90, base: 'dark', borders: true, glow: !phone.matches, open: !phone.matches};
+try { Object.assign(state, JSON.parse(localStorage.getItem('wildfireSeasons') || '{}')); } catch (e) {}
+if (!BASES[state.base]) state.base = 'dark';
+const save = () => { try { localStorage.setItem('wildfireSeasons', JSON.stringify(state)); } catch (e) {} };
+const theme = () => BASES[state.base][2];
+
+// ---- data -------------------------------------------------------------------------
+const N = D.lat.length, NX = Math.round(360 / RES), NY = Math.round(180 / RES), HAS_A = !!D.A;
+const CT = Int32Array.from(D.cty), CI = new Int32Array(N), CJ = new Int32Array(N);
+const REC = D.B.map(r => Float32Array.from(r, v => v / 1000));
+const PRE = HAS_A ? D.A.map(r => Float32Array.from(r, v => v / 1000)) : null;
+const TYP = HAS_A ? REC.map((r, m) => r.map((v, i) => (v + PRE[m][i]) / 2)) : REC;
+const CHG = HAS_A ? REC.map((r, m) => r.map((v, i) => v - PRE[m][i])) : null;
+const LAYERS = {typical: TYP, recent: REC, change: CHG};
+const TOT = {recent: META.totals.B, before: META.totals.A};
+TOT.typical = HAS_A ? TOT.recent.map((v, m) => (v + TOT.before[m]) / 2) : TOT.recent;
+TOT.change = HAS_A ? TOT.recent.map((v, m) => v - TOT.before[m]) : null;
+const lookup = new Map();
+for (let i = 0; i < N; i++) {
+  CI[i] = Math.floor((D.lat[i] + 90) / RES); CJ[i] = Math.floor((D.lon[i] + 180) / RES);
+  lookup.set(CI[i] * NX + CJ[i], i);
+}
+const merc = lat => { const s = Math.max(-85.05, Math.min(85.05, lat)) * Math.PI / 180;
+  return 0.5 - Math.log(Math.tan(Math.PI / 4 + s / 2)) / (2 * Math.PI); };
+const ROWF = Float64Array.from({length: NY + 1}, (_, i) => merc(-90 + i * RES));
+
+// ---- view state: month (animated), season or whole year -----------------------------
+let view = 'month', season = 0, t = META.now_month, playing = false, instant = true, dirty = true, seasonClock = 0;
+const Wc = new Float32Array(12), Wt = new Float32Array(12);
+function setTargets() {
+  Wt.fill(0);
+  if (view === 'month') { const a = Math.floor(t) % 12, f = t - Math.floor(t); Wt[a] += 1 - f; Wt[(a + 1) % 12] += f; }
+  else if (view === 'season') SEASONS[season][1].forEach(m => Wt[m] = 1 / 3);
+  else Wt.fill(1 / 12);
+}
+const layerArr = () => LAYERS[state.layer] || TYP;
+const monthIdx = () => Math.round(t) % 12;
+
+// ---- colours ------------------------------------------------------------------------
+const NB = 40, LOG100 = Math.log(100);
+const RAMP = {
+  dark: [[0, [104, 24, 22]], [.35, [190, 44, 28]], [.62, [238, 104, 22]], [.86, [252, 176, 48]], [1, [255, 232, 150]]],
+  light: [[0, [253, 226, 130]], [.3, [251, 178, 40]], [.55, [240, 104, 22]], [.78, [205, 32, 36]], [1, [112, 20, 24]]],
+};
+const CRAMP = {   // change vs year before: [low-end colour, strong colour] for decrease and increase
+  dark: {neg: [[44, 70, 110], [110, 190, 255]], pos: [[120, 52, 24], [255, 196, 64]]},
+  light: {neg: [[170, 200, 235], [25, 80, 170]], pos: [[250, 205, 130], [190, 30, 30]]},
+};
+const lerpC = (a, b, f) => a.map((v, k) => Math.round(v + (b[k] - v) * f));
+function rampRgb(u, th) {
+  const st = RAMP[th];
+  for (let i = 1; i < st.length; i++) if (u <= st[i][0]) { const [u0, a] = st[i - 1], [u1, b] = st[i]; return lerpC(a, b, (u - u0) / (u1 - u0)); }
+  return st[st.length - 1][1];
+}
+let FILL = [], SOLID = [], GLOW_FROM = 0;
+function buildColours() {
+  const th = theme(), dark = th === 'dark';
+  if (state.layer === 'change') {
+    const c = CRAMP[th], half = NB / 2;
+    SOLID = Array.from({length: NB}, (_, b) => b < half ? lerpC(c.neg[1], c.neg[0], (b + .5) / half) : lerpC(c.pos[0], c.pos[1], (b - half + .5) / half));
+    FILL = SOLID.map((col, b) => { const u = b < half ? 1 - (b + .5) / half : (b - half + .5) / half; return `rgba(${col},${(dark ? .55 : .75) + .25 * u})`; });
+    GLOW_FROM = half + Math.floor(half * .6);
+  } else {
+    SOLID = Array.from({length: NB}, (_, b) => rampRgb((b + .5) / NB, th));
+    FILL = SOLID.map((c, b) => `rgba(${c},${(dark ? .5 : .78) + (dark ? .5 : .22) * (b + .5) / NB})`);
+    GLOW_FROM = Math.floor(NB * Math.log(30) / LOG100);
+  }
+}
+const bucketOf = v => {
+  if (state.layer === 'change') {
+    const u = Math.max(0, Math.min(.999, Math.log(Math.abs(v) / 0.01) / Math.log(50))), k = Math.min(NB / 2 - 1, Math.floor(u * NB / 2));
+    return v < 0 ? NB / 2 - 1 - k : NB / 2 + k;
+  }
+  return Math.max(0, Math.min(NB - 1, Math.floor(NB * Math.log(Math.max(v, .01) * 100) / LOG100)));
+};
+const colourOf = v => `rgb(${SOLID[bucketOf(v)]})`;
+
+// ---- map ----------------------------------------------------------------------------
+const map = L.map('map', {worldCopyJump: true, zoomControl: false, minZoom: 2, zoomAnimation: false, markerZoomAnimation: false})
+  .setView(phone.matches ? [8, 20] : [14, 18], phone.matches ? 2 : 3);
+L.control.zoom({position: 'bottomright'}).addTo(map);
+const credit = ' | Fire data: NASA FIRMS (VIIRS)';
+let baseLayer = null;
+const borderLine = L.polyline(B, {weight: 0.7, interactive: false, renderer: L.canvas({padding: 0.4})});
+const pane = map.createPane('cells'); pane.style.zIndex = 390; pane.style.pointerEvents = 'none';
+const cv = L.DomUtil.create('canvas', 'cells-cv', pane), gl = L.DomUtil.create('canvas', 'cells-glow', pane);
+const ctx = cv.getContext('2d'), gtx = gl.getContext('2d');
+map.createPane('hl').style.zIndex = 395;
+const hl = L.rectangle([[0, 0], [0, 0]], {pane: 'hl', interactive: false, fill: false, weight: 2});
+const outline = () => theme() === 'dark' ? '#ffffff' : '#111827';
+
+const VAL = new Float32Array(N);
+const ACTM = new Int32Array(12), ACTW = new Float32Array(12);
+function evaluate() {
+  const L2 = layerArr();
+  let n = 0;
+  for (let m = 0; m < 12; m++) if (Wc[m] > 1e-4) { ACTM[n] = m; ACTW[n++] = Wc[m]; }
+  if (n === 1) { VAL.set(L2[ACTM[0]]); return; }
+  for (let i = 0; i < N; i++) { let v = 0; for (let k = 0; k < n; k++) v += ACTW[k] * L2[ACTM[k]][i]; VAL[i] = v; }
+}
+const thr = () => STEPS[state.step] / 100;
+const eligible = v => state.layer === 'change' ? Math.abs(v) >= thr() : v >= thr();
+
+const BK = new Uint8Array(N), X0 = new Int32Array(N), Y0 = new Int32Array(N), WW = new Int32Array(N), HH = new Int32Array(N);
+const colX = new Int32Array(NX + 1), rowY = new Int32Array(NY + 1);
+const CNT = new Int32Array(NB + 2), POS = new Int32Array(NB + 2), ORD = new Int32Array(N);
+function draw() {
+  const size = map.getSize(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = Math.round(size.x * dpr), Hh = Math.round(size.y * dpr);
+  for (const c of [cv, gl]) {
+    if (c.width !== W || c.height !== Hh) { c.width = W; c.height = Hh; c.style.width = size.x + 'px'; c.style.height = size.y + 'px'; }
+    L.DomUtil.setPosition(c, map.containerPointToLayerPoint([0, 0]));
+  }
+  ctx.clearRect(0, 0, W, Hh); gtx.clearRect(0, 0, W, Hh);
+  const S = 256 * Math.pow(2, map.getZoom()), org = map.getPixelBounds().min;
+  const glowOn = state.glow && theme() === 'dark';
+  for (let i = 0; i <= NY; i++) rowY[i] = Math.round((ROWF[i] * S - org.y) * dpr);
+  for (let shift = -1; shift <= 1; shift++) {
+    const left = (shift * S - org.x) * dpr;
+    if (left > W || left + S * dpr < 0) continue;
+    for (let j = 0; j <= NX; j++) colX[j] = Math.round(left + j / NX * S * dpr);
+    for (let i = 0; i < N; i++) {
+      BK[i] = 255;
+      const v = VAL[i];
+      if (!eligible(v)) continue;
+      const x0 = colX[CJ[i]], x1 = colX[CJ[i] + 1], y0 = rowY[CI[i] + 1], y1 = rowY[CI[i]];
+      if (x1 < 0 || x0 > W || y1 < 0 || y0 > Hh) continue;
+      X0[i] = x0; Y0[i] = y0; WW[i] = Math.max(1, x1 - x0); HH[i] = Math.max(1, y1 - y0);
+      BK[i] = bucketOf(v);
+    }
+    CNT.fill(0);
+    for (let i = 0; i < N; i++) if (BK[i] !== 255) CNT[BK[i] + 1]++;
+    for (let b = 0; b < NB; b++) CNT[b + 1] += CNT[b];
+    POS.set(CNT);
+    for (let i = 0; i < N; i++) if (BK[i] !== 255) ORD[POS[BK[i]]++] = i;
+    for (let b = 0; b < NB; b++) {
+      if (CNT[b + 1] === CNT[b]) continue;
+      ctx.beginPath();
+      const g = glowOn && b >= GLOW_FROM;
+      if (g) gtx.beginPath();
+      for (let q = CNT[b]; q < CNT[b + 1]; q++) { const i = ORD[q]; ctx.rect(X0[i], Y0[i], WW[i], HH[i]); if (g) gtx.rect(X0[i], Y0[i], WW[i], HH[i]); }
+      ctx.fillStyle = FILL[b]; ctx.fill();
+      if (g) { gtx.fillStyle = `rgb(${SOLID[b]})`; gtx.fill(); }
+    }
+  }
+}
+
+// ---- panel: numbers, legend, chart ---------------------------------------------------
+const wTotal = arr => { let s = 0; for (let m = 0; m < 12; m++) s += Wc[m] * arr[m]; return s; };
+const viewTitle = () => view === 'month' ? MONF[monthIdx()] : view === 'season' ? SEASONS[season][0] : 'Whole year';
+const layerName = () => state.layer === 'change' ? 'change vs the year before' : state.layer === 'recent' ? 'last 12 months' : 'typical';
+const nC = D.countries.length, cS = new Float64Array(nC), cN = new Int32Array(nC);
+function stats(full) {
+  const change = state.layer === 'change';
+  const tot = wTotal(TOT[state.layer] || TOT.typical);
+  let n = 0;
+  for (let i = 0; i < N; i++) if (eligible(VAL[i])) n++;
+  $('headline').innerHTML = change
+    ? `<b class="${tot >= 0 ? 'up' : 'down'}">${sgn(tot)}</b> squares on fire per day, ${viewTitle().toLowerCase()}`
+    : `<b>≈ ${fmt(tot)}</b> squares on fire per day, ${viewTitle().toLowerCase()}`;
+  $('tbSub').textContent = change ? `${sgn(tot)} squares/day vs the year before` : `≈ ${fmt(tot)} squares on fire per day`;
+  $('headSub').textContent = `${fmt(n)} squares shown, each about ${Math.round(RES * 111)} km wide`;
+  if (!full) return;
+  cS.fill(0); cN.fill(0);
+  for (let i = 0; i < N; i++) if (eligible(VAL[i])) { cS[CT[i]] += VAL[i]; cN[CT[i]]++; }
+  const ok = [...cS.keys()].filter(k => cN[k] && D.countries[k] !== 'Ocean / unassigned' && D.countries[k] !== 'Unassigned');
+  const row = k => `<button class="country" data-k="${k}" title="Zoom to ${D.countries[k]}">${D.countries[k]}<small class="${change ? (cS[k] >= 0 ? 'up' : 'down') : ''}">${change ? sgn(cS[k]) : fmt(cS[k])}</small></button>`;
+  let html;
+  if (change) {
+    const up = ok.filter(k => cS[k] > 0).sort((a, b) => cS[b] - cS[a]).slice(0, 4), dn = ok.filter(k => cS[k] < 0).sort((a, b) => cS[a] - cS[b]).slice(0, 3);
+    html = '<div class="sep">More fire than the year before</div>' + (up.map(row).join('') || '<div class="hint">None</div>') +
+           '<div class="sep">Less fire than the year before</div>' + (dn.map(row).join('') || '<div class="hint">None</div>');
+    $('ctTitle').textContent = 'Biggest changes'; $('ctUnit').textContent = 'squares on fire / day';
+  } else {
+    html = ok.sort((a, b) => cS[b] - cS[a]).slice(0, 7).map(row).join('') || '<div class="hint">Nothing above this level.</div>';
+    $('ctTitle').textContent = 'Top countries'; $('ctUnit').textContent = 'squares on fire / day';
+  }
+  $('countries').innerHTML = html;
+  $('countries').querySelectorAll('.country').forEach(el => el.onclick = () => {
+    const k = +el.dataset.k;
+    let s = 90, n2 = -90, w = 180, e = -180;
+    for (let i = 0; i < N; i++) if (CT[i] === k && eligible(VAL[i])) { s = Math.min(s, D.lat[i]); n2 = Math.max(n2, D.lat[i]); w = Math.min(w, D.lon[i]); e = Math.max(e, D.lon[i]); }
+    if (s <= n2) map.flyToBounds([[s - H, w - H], [n2 + H, e + H]], {padding: [40, 40], maxZoom: 7, duration: 1.1});
+  });
+}
+function renderLegend() {
+  const th = theme(), change = state.layer === 'change';
+  const ramp = change
+    ? `linear-gradient(90deg,rgb(${CRAMP[th].neg[1]}),rgb(${CRAMP[th].neg[0]}) 45%,rgb(${CRAMP[th].pos[0]}) 55%,rgb(${CRAMP[th].pos[1]}))`
+    : `linear-gradient(90deg,${RAMP[th].map(([u, c]) => `rgb(${c}) ${u * 100}%`).join(',')})`;
+  $('legend').innerHTML = `<div class="bar" style="background:${ramp}"></div>` + (change
+    ? '<div class="ticks"><span>less fire</span><span>no change</span><span>more fire</span></div>'
+    : '<div class="ticks"><span>1%</span><span>3%</span><span>10%</span><span>30%</span><span>100%</span></div><div class="hint" style="margin-top:4px">share of days with a fire in the square</div>');
+  $('thrLabel').textContent = change ? 'Show change of at least' : 'Show squares with fire on at least';
+  $('thrVal').textContent = STEPS[state.step] + (change ? ' pts' : '% of days');
+  $('layerNote').textContent = {typical: `Average of ${HAS_A ? 'two years' : 'the last year'}: the usual pattern of the season.`,
+    recent: `Only the last 12 months (${META.recent}).`,
+    change: `Last 12 months minus the year before (${META.before}). Red = more fire days, blue = fewer.`}[state.layer];
+}
+// small chart: two years of global fire squares by month, with a marker for the shown month/season
+const CW = 280, CH = 96, PX0 = 8, PX1 = 272, PY0 = 8, PY1 = 76;
+const cx = m => PX0 + (PX1 - PX0) * m / 11;
+function buildChart() {
+  const all = [...TOT.recent, ...(TOT.before || [])], mx = Math.max(...all) * 1.08, my = v => PY1 - (PY1 - PY0) * v / mx;
+  const line = (arr, col, w) => `<polyline fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" points="${arr.map((v, m) => `${cx(m).toFixed(1)},${my(v).toFixed(1)}`).join(' ')}"/>`;
+  const lab = MON.map((m, k) => `<text x="${cx(k)}" y="90" text-anchor="middle" font-size="9" fill="var(--muted)">${phone.matches ? m[0] : m}</text>`).filter((_, k) => !phone.matches || true).join('');
+  $('chart').innerHTML = `<rect id="band" x="0" y="${PY0 - 4}" width="0" height="${PY1 - PY0 + 4}" fill="var(--hot)" opacity=".13"/>` +
+    `<line x1="${PX0}" x2="${PX1}" y1="${PY1}" y2="${PY1}" stroke="var(--line)"/>` + lab +
+    (TOT.before ? line(TOT.before, 'var(--muted)', 1.6) : '') + line(TOT.recent, 'var(--hot)', 2.2) +
+    `<line id="mk" x1="0" x2="0" y1="${PY0 - 4}" y2="${PY1}" stroke="var(--fg)" stroke-width="1" opacity=".6"/>` +
+    `<circle id="dot" r="3.6" fill="var(--hot)" stroke="var(--panel)" stroke-width="1.5" cx="0" cy="0"/>`;
+  chartScale = {mx, my};
+  $('chartKey').innerHTML = `<span><i style="background:var(--hot)"></i>${META.recent}</span>` + (META.before ? `<span><i style="background:var(--muted)"></i>${META.before}</span>` : '');
+  const pk = TOT.typical.indexOf(Math.max(...TOT.typical)), lo = TOT.typical.indexOf(Math.min(...TOT.typical));
+  let txt = `Busiest month: <b>${MONF[pk]}</b> (≈ ${fmt(TOT.typical[pk])} squares/day). Quietest: <b>${MONF[lo]}</b> (≈ ${fmt(TOT.typical[lo])}).`;
+  if (HAS_A) { const a = TOT.before.reduce((x, y) => x + y), b = TOT.recent.reduce((x, y) => x + y), d = (b / a - 1) * 100;
+    txt += ` Last 12 months vs the year before: <b class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(1)}%</b> fire days.`; }
+  $('trend').innerHTML = txt;
+}
+let chartScale = null;
+function chartUI() {
+  if (!chartScale) return;
+  const band = $('band'), mk = $('mk'), dot = $('dot');
+  const tr = TOT[state.layer === 'change' ? 'recent' : state.layer] || TOT.recent;
+  if (view === 'month') {
+    const a = Math.floor(t) % 12, f = t - Math.floor(t), b = (a + 1) % 12;
+    const x = a === 11 ? cx(11) + (cx(0) - cx(11)) * 0 : cx(a) + (cx(a + 1) - cx(a)) * f;
+    const v = tr[a] + (tr[b] - tr[a]) * f;
+    mk.setAttribute('x1', x); mk.setAttribute('x2', x); dot.setAttribute('cx', x); dot.setAttribute('cy', chartScale.my(v)); dot.style.display = '';
+    mk.style.display = ''; band.setAttribute('width', 0);
+  } else {
+    const ms = view === 'season' ? SEASONS[season][1] : [0, 11];
+    const lo = Math.min(...ms.map(m => cx(m))) - 12, hi = Math.max(...ms.map(m => cx(m))) + 12;
+    band.setAttribute('x', view === 'season' && season === 0 ? PX0 - 6 : lo); band.setAttribute('width', view === 'season' && season === 0 ? PX1 - PX0 + 12 : hi - lo);
+    mk.style.display = 'none'; dot.style.display = 'none';
+  }
+}
+
+// ---- time bar -----------------------------------------------------------------------
+const ICON = {play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+              pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>'};
+function buildChips() {
+  const chips = $('chips');
+  if (view === 'month') chips.innerHTML = MON.map((m, k) => `<button data-k="${k}" class="${k === META.now_month ? 'now' : ''}" title="${MONF[k]}">${phone.matches ? m[0] : m}</button>`).join('');
+  else if (view === 'season') chips.innerHTML = SEASONS.map((s, k) => `<button data-k="${k}" title="${s[2]}">${s[0]}</button>`).join('');
+  else chips.innerHTML = '<span class="hint" style="padding:2px 3px">All 12 months averaged</span>';
+  chips.querySelectorAll('button').forEach(b => b.onclick = () => {
+    setPlaying(false); instant = false;
+    if (view === 'month') { t = +b.dataset.k; } else { season = +b.dataset.k; }
+    setTargets(); dirty = true;
+  });
+  document.querySelector('.tb').classList.toggle('static', view !== 'month');
+  $('play').hidden = view === 'year';
+}
+let shownKey = '';
+function timeUI() {
+  if (document.activeElement !== $('time') || playing) $('time').value = Math.round((t % 12) * 100);
+  const key = view + (view === 'month' ? monthIdx() : view === 'season' ? season : '') + state.layer;
+  if (key === shownKey) return;
+  shownKey = key;
+  $('tbDate').textContent = viewTitle();
+  document.querySelectorAll('#chips button').forEach(b => b.classList.toggle('on', view === 'month' ? +b.dataset.k === monthIdx() : view === 'season' && +b.dataset.k === season));
+  $('view').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  if (popup && popCell >= 0 && map.hasLayer(popup)) popup.setContent(popupHtml(popCell));
+}
+function setPlaying(on, remember) {
+  playing = on && view !== 'year';
+  $('play').innerHTML = playing ? ICON.pause : ICON.play;
+  if (playing) { instant = view === 'month'; seasonClock = 0; }
+}
+$('play').onclick = () => setPlaying(!playing);
+$('time').oninput = e => { setPlaying(false); instant = true; t = +e.target.value / 100; setTargets(); dirty = true; };
+$('view').querySelectorAll('button').forEach(b => b.onclick = () => {
+  const was = playing; view = b.dataset.v; instant = false;
+  if (view === 'month') t = Math.round(t) % 12;
+  buildChips(); setTargets(); shownKey = ''; dirty = true;
+  setPlaying(was && view !== 'year');
+});
+
+let last = performance.now(), lastFull = 0;
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (playing && view === 'month') { t = (t + dt / 0.9) % 12; setTargets(); }
+  if (playing && view === 'season') { seasonClock += dt; if (seasonClock > 2.4) { seasonClock = 0; season = (season + 1) % 4; setTargets(); } }
+  let moving = false;
+  for (let m = 0; m < 12; m++) {
+    const d = Wt[m] - Wc[m];
+    if (Math.abs(d) > 0.0004) { Wc[m] += instant ? d : d * Math.min(1, dt * 9); moving = true; }
+    else if (d !== 0) { Wc[m] = Wt[m]; moving = true; }
+  }
+  if (moving || dirty) {
+    const full = !moving || now - lastFull > 250;
+    dirty = false; evaluate(); draw(); stats(full); timeUI(); chartUI();
+    if (full) lastFull = now;
+  }
+  requestAnimationFrame(frame);
+}
+map.on('move zoom resize', () => { dirty = true; });
+
+// ---- popup & hover ------------------------------------------------------------------
+function cellAt(latlng) {
+  const ll = latlng.wrap();
+  const i = lookup.get(Math.floor((ll.lat + 90) / RES) * NX + Math.floor((ll.lng + 180) / RES));
+  return i !== undefined && eligible(VAL[i]) ? i : -1;
+}
+const boundsOf = (i, lng) => { const lo = D.lon[i] + 360 * Math.round((lng - D.lon[i]) / 360); return [[D.lat[i] - H, lo - H], [D.lat[i] + H, lo + H]]; };
+let popup = null, popCell = -1;
+function popupHtml(i) {
+  const v = VAL[i], change = state.layer === 'change';
+  const ns = D.lat[i] >= 0 ? 'N' : 'S', ew = D.lon[i] >= 0 ? 'E' : 'W';
+  const arr = TYP, mx = Math.max(...arr.map(r => r[i]), .01);
+  const sel = new Set(view === 'month' ? [monthIdx()] : view === 'season' ? SEASONS[season][1] : []);
+  const bars = '<div class="pop-months">' + MON.map((m, k) =>
+    `<div class="${sel.has(k) ? 'on' : ''}"><i style="height:${Math.max(2, Math.round(arr[k][i] / mx * 40))}px;background:${colourOfTyp(arr[k][i])}"></i>${m[0]}</div>`).join('') + '</div>';
+  const pk = arr.map(r => r[i]).indexOf(mx);
+  let head, note = '';
+  if (change) { head = `<div class="pop-p ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : '−'}${(Math.abs(v) * 100).toFixed(1)} pts</div><div>fire days vs the year before, ${viewTitle().toLowerCase()}</div>`; }
+  else head = `<div class="pop-p">Fire on ${pct(v)} of days</div><div>${viewTitle().toLowerCase()}, ${layerName()}</div>`;
+  if (HAS_A && !change) { let d = 0; for (let m = 0; m < 12; m++) d += Wc[m] * CHG[m][i];
+    note = `<div class="pop-note">vs the year before: <b class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : '−'}${(Math.abs(d) * 100).toFixed(1)} pts</b></div>`; }
+  return `${head}<div class="pop-place">${D.countries[CT[i]]}, ${Math.abs(D.lat[i]).toFixed(2)}°${ns} ${Math.abs(D.lon[i]).toFixed(2)}°${ew}</div>${bars}
+    <div>Peak month: <b>${MONF[pk]}</b> (${pct(mx)} of days)</div>${note}`;
+}
+function colourOfTyp(v) { const th = theme(); return `rgb(${rampRgb(Math.max(0, Math.min(1, Math.log(Math.max(v, .01) * 100) / LOG100)), th)})`; }
+map.on('mousemove', e => {
+  const i = cellAt(e.latlng);
+  map.getContainer().classList.toggle('over-cell', i >= 0);
+  if (i < 0) { map.removeLayer(hl); return; }
+  hl.setBounds(boundsOf(i, e.latlng.lng)).addTo(map);
+});
+map.on('mouseout', () => map.removeLayer(hl));
+map.on('popupclose', () => { popCell = -1; });
+map.on('click', e => {
+  const i = cellAt(e.latlng);
+  if (i < 0) return;
+  popCell = i;
+  popup = L.popup({maxWidth: 300}).setLatLng(e.latlng).setContent(popupHtml(i)).openOn(map);
+});
+
+// ---- settings -----------------------------------------------------------------------
+function applyBase() {
+  if (baseLayer) map.removeLayer(baseLayer);
+  const [url, attr] = BASES[state.base];
+  baseLayer = L.tileLayer(url, {maxZoom: 18, maxNativeZoom: 16, attribution: attr + credit}).addTo(map);
+  baseLayer.bringToBack();
+  document.body.classList.toggle('dark', theme() === 'dark');
+  borderLine.setStyle({color: theme() === 'dark' ? '#ffffff' : '#334155', opacity: theme() === 'dark' ? 0.22 : 0.35});
+  hl.setStyle({color: outline()});
+  buildColours(); renderLegend(); if (chartScale) buildChart(); dirty = true;
+}
+function applyOverlays() {
+  state.borders ? borderLine.addTo(map) : map.removeLayer(borderLine);
+  document.body.classList.toggle('noglow', !state.glow);
+  pane.style.opacity = state.opacity / 100;
+  dirty = true;
+}
+function applyOpen() { $('panel').classList.toggle('closed', !state.open); $('collapse').textContent = state.open ? '−' : '+'; }
+$('collapse').onclick = () => { state.open = !state.open; applyOpen(); save(); };
+$('thr').oninput = e => { state.step = +e.target.value; renderLegend(); dirty = true; save(); };
+$('op').oninput = e => { state.opacity = +e.target.value; applyOverlays(); save(); };
+$('glow').onchange = e => { state.glow = e.target.checked; applyOverlays(); save(); };
+$('base').onchange = e => { state.base = e.target.value; applyBase(); save(); };
+$('borders').onchange = e => { state.borders = e.target.checked; applyOverlays(); save(); };
+$('layer').onchange = e => { state.layer = e.target.value; shownKey = ''; buildColours(); renderLegend(); dirty = true; save(); };
+
+// ---- init ---------------------------------------------------------------------------
+const opts = [['typical', 'Typical (average of the years)'], ['recent', 'Last 12 months']].concat(HAS_A ? [['change', 'Change vs the year before']] : []);
+$('layer').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+if (!LAYERS[state.layer] || !opts.some(o => o[0] === state.layer)) state.layer = 'typical';
+state.step = Math.max(0, Math.min(STEPS.length - 1, state.step | 0));
+$('layer').value = state.layer; $('thr').max = STEPS.length - 1; $('thr').value = state.step; $('op').value = state.opacity;
+$('base').value = state.base; $('glow').checked = state.glow; $('borders').checked = state.borders;
+$('meta').innerHTML = META.rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+applyOpen(); buildChips(); buildChart(); applyBase(); applyOverlays();
+setTargets(); Wc.set(Wt);
+requestAnimationFrame(now => { last = now; frame(now); });
+setPlaying(false);
+if (!calm) setTimeout(() => setPlaying(true), 1800);
+</script>
+</body></html>

@@ -84,6 +84,17 @@ Eight 21-day blocks spread over two years. For each block a smaller model (1.5 m
 - The ranking of new ignitions stays stable (ROC-AUC 0.84-0.92), weakest in July 2026.
 - The November block matches the main held-out test (0.651 vs 0.657), so that test is representative.
 
+## Seasons and years (`climate`)
+```bash
+python fire_forecast.py climate           # ~10 min the first time (reads two years of fire files), writes output/firms/climate_map.html
+python fire_forecast.py climate --reuse   # redraw from the saved monthly tables (a few seconds)
+```
+A second map, linked from the 4-day map, for the global picture instead of the next days:
+- **Months, seasons, whole year.** Each square shows on what share of days of that month it has a fire seen by satellite, averaged over the last two complete years (24 months, so each calendar month has two observations). The months play as an animation; seasons are Dec-Feb, Mar-May, Jun-Aug, Sep-Nov.
+- **Change vs the year before.** Last 12 months minus the 12 before, per square (red = more fire days, blue = fewer), plus a global chart by month and the total change.
+- This is the usual pattern of the season, not a weather forecast: the weather months ahead is unknown. Two years show the yearly rhythm and a first comparison, not a climate trend. For a real trend, download more years of FIRMS data (`--days` larger, `data/climate_months.npz` is rebuilt).
+- Same filters as the forecast: only vegetation fires, labelled and year-round heat sources removed, land only.
+
 ## Limitations
 - **New ignitions far from any fire are rare and hard to predict.** They make up about 0.04% of cells per day. The model ranks them well (ROC-AUC ≈ 0.91), but their absolute probabilities stay low (≤ 15%). Fire is often started by people, and no weather model can see that.
 - Heat sources that NASA does not label are removed only if they burn year-round (see below). Short-lived ones, e.g. a flare that ran for a few weeks, can still appear.

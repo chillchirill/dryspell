@@ -36,6 +36,7 @@ body.noglow .cells-glow { display:none; }
 h2 { margin:0 0 6px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; gap:8px; }
 h2 span { font-weight:400; color:var(--muted); }
 .num { font-variant-numeric:tabular-nums; }
+a { color:var(--hot); text-decoration:none; } a:hover { text-decoration:underline; }
 .summary b { font-weight:600; }
 .hint { color:var(--muted); font-size:12.5px; }
 
@@ -144,7 +145,7 @@ body.picking .leaflet-container { cursor:crosshair; }
 
 <aside class="panel" id="panel">
   <div class="head">
-    <div><h1>Wildfire forecast</h1><div class="sub" id="valid"></div></div>
+    <div><h1>Wildfire forecast</h1><div class="sub" id="valid"></div><div class="sub"><a href="climate_map.html">Seasons and years &rarr;</a></div></div>
     <button class="collapse" id="collapse" aria-label="Hide or show the panel">&minus;</button>
   </div>
   <div class="body">
