@@ -77,6 +77,7 @@ CONFIG = {
 }
 RISK_COLORS = {"Low": "#facc15", "Moderate": "#fb923c", "High": "#ef4444", "Very high": "#be123c"}
 MAP_TEMPLATE = Path(__file__).with_name("map_template.html")
+CLIMATE_TEMPLATE = Path(__file__).with_name("climate_template.html")
 SAT_COLORS = {"N20": "#1565c0", "N21": "#00897b", "N": "#6a1b9a"}
 
 FIRE_FEATURES = [
@@ -1137,6 +1138,114 @@ def cmd_predict(args):
     print(f"Outputs: {out / 'forecast_map.html'}  {out / 'forecast_latest.csv'}")
 
 
+def monthly_burn_days(days: int, args, grid: Grid, static: np.ndarray):
+    """Share of days with a detection per (calendar month, cell), for every complete month of the history."""
+    groups = {}
+    for pth in fire_paths(days, args):
+        try:
+            start = pd.Timestamp(pth.stem.split("_")[-2])
+        except ValueError:
+            raise SystemExit("the seasonal view needs the FIRMS API key (FIRMS_MAP_KEY)")
+        groups.setdefault((start - EPOCH).days // 30, []).append(pth)
+    N = grid.ny * grid.nx
+    keys, t_min, t_max = [], None, None
+    for k, key in enumerate(sorted(groups), 1):
+        det = firms_fetch.load_detections(groups[key], CONFIG["min_confidence"])
+        det = drop_static(det, grid, static, quiet=True)
+        t_min = det["time"].min() if t_min is None else min(t_min, det["time"].min())
+        t_max = det["time"].max() if t_max is None else max(t_max, det["time"].max())
+        day = (det["time"].dt.floor("D") - EPOCH).dt.days.to_numpy(np.int64)
+        keys.append(np.unique(day * N + grid.cell(det["lat"], det["lon"])))
+        del det
+        if k % 6 == 0 or k == len(groups):
+            print(f"    {k}/{len(groups)} months read")
+    keys = np.unique(np.concatenate(keys))
+    day, cell = keys // N, keys % N
+    last_full = t_max.floor("D") - pd.Timedelta(days=1)         # the newest day may be incomplete
+    first_day = max(t_min.floor("D"), last_full - pd.Timedelta(days=days))
+    when = EPOCH + pd.to_timedelta(day, unit="D")
+    ym = (when.year * 12 + when.month - 1).to_numpy()
+    out = {}
+    for m in np.unique(ym):
+        start = pd.Timestamp(int(m) // 12, int(m) % 12 + 1, 1)
+        end = start + pd.offsets.MonthEnd(0)
+        if start < first_day or end > last_full:
+            continue                                              # partial month: skip
+        out[int(m)] = (np.bincount(cell[ym == m], minlength=N) / end.day).astype(np.float32)
+    return out, first_day, last_full
+
+
+MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def cmd_climate(args):
+    """Month / season / year view: how fire activity moves through the year and how it changed vs the year before."""
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    grid = Grid(CONFIG["grid_res_deg"])
+    country, names, polys = static_layers(grid)
+    static = static_source_mask(grid)
+    if args.days >= PERSIST_MIN_HISTORY:
+        build_persistent_sources(fire_paths(args.days, args))
+    print(f"[1/2] Burning days per month ({args.days} days of VIIRS fire detections)")
+    cache = DATA / "climate_months.npz"
+    if args.reuse and cache.exists():
+        with np.load(cache) as z:
+            months = {int(k[1:]): z[k] for k in z.files if k.startswith("m")}
+            first_day, last_full = pd.Timestamp(str(z["first"])), pd.Timestamp(str(z["last"]))
+        print("  reusing the saved monthly tables (data/climate_months.npz)")
+    else:
+        months, first_day, last_full = monthly_burn_days(args.days, args, grid, static)
+        np.savez_compressed(cache, first=str(first_day), last=str(last_full), **{f"m{k}": v for k, v in months.items()})
+    yms = sorted(months)
+    if len(yms) < 12:
+        raise SystemExit(f"need at least 12 complete months, found {len(yms)}: use --days 760")
+    recent = yms[-12:]
+    before = yms[-24:-12] if len(yms) >= 24 else []
+    label = lambda y: (f"{MONTH_NAMES[y[0] % 12]} {y[0] // 12} - {MONTH_NAMES[y[-1] % 12]} {y[-1] // 12}")
+    print(f"  recent 12 months: {label(recent)}" + (f" | the year before: {label(before)}" if before else ""))
+    N = grid.ny * grid.nx
+    PB = np.zeros((12, N), np.float32)
+    PA = np.zeros((12, N), np.float32)
+    for y in recent:
+        PB[y % 12] = months[y]
+    for y in before:
+        PA[y % 12] = months[y]
+    ever = np.nonzero((PB.max(0) > 0) | (PA.max(0) > 0))[0]
+    cells = land_cells(grid, country, ever, args.bbox, static)
+
+    print("[2/2] Writing the map")
+    pb, pa = PB[:, cells], PA[:, cells]
+    both = np.maximum(pb.max(0), pa.max(0))
+    keep = np.nonzero(both >= CONFIG["map_min_prob"])[0]
+    lat, lon = grid.center(cells)
+    cnames = np.asarray(country_of(cells, country, names))
+    codes, uniq = pd.factorize(pd.Series(cnames[keep]).fillna("Unassigned"))
+
+    def mat(a):
+        return [np.round(a[m][keep] * 1000).astype(int).tolist() for m in range(12)]
+
+    data = {"lat": np.round(lat[keep], 3).tolist(), "lon": np.round(lon[keep], 3).tolist(),
+            "cty": codes.tolist(), "countries": [str(n) for n in uniq],
+            "B": mat(pb), "A": mat(pa) if before else None}
+    totals = {"B": [round(float(pb[m].sum()), 1) for m in range(12)],
+              "A": [round(float(pa[m].sum()), 1) for m in range(12)] if before else None}
+    meta = {"recent": label(recent), "before": label(before) if before else None, "totals": totals,
+            "now_month": int(pd.Timestamp.now(tz="UTC").month) - 1,
+            "rows": [["Fire data", f"NASA FIRMS VIIRS, {first_day:%Y-%m-%d} to {last_full:%Y-%m-%d}"],
+                     ["Months used", f"{len(yms)} complete months"],
+                     ["Grid", f"{CONFIG['grid_res_deg']}° cells"]]}
+    borders = [[[round(float(y), 2), round(float(x), 2)] for x, y in ring] for _, ring, _ in polys]
+    html = CLIMATE_TEMPLATE.read_text(encoding="utf-8")
+    fill = {"__DATA__": data, "__BORDERS__": borders, "__META__": meta, "__RES__": CONFIG["grid_res_deg"]}
+    for token, value in fill.items():
+        html = html.replace(token, json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+    (out / "climate_map.html").write_text(html, encoding="utf-8")
+    pd.DataFrame({"month": MONTH_NAMES, "burning_squares_recent": totals["B"],
+                  "burning_squares_before": totals["A"] if before else np.nan}).to_csv(out / "climate_by_month.csv", index=False)
+    print(f"  {len(keep):,} squares on the map. Saved {out / 'climate_map.html'} and climate_by_month.csv")
+
+
 def cmd_backtest(args):
     """Score the next-24 h model in blocks spread over the whole history (needs ``train --keep-frames``)."""
     tag = args.tag or "prod"
@@ -1202,7 +1311,7 @@ def main():
     bt.add_argument("--block-days", type=int, default=21)
     bt.add_argument("--train-rows", type=int, default=1_500_000)
     bt.add_argument("--out", default=str(ROOT / "output" / "firms"))
-    for name in ("train", "predict"):
+    for name in ("train", "predict", "climate"):
         sp = sub.add_parser(name)
         sp.add_argument("--map-key", default=None, help="FIRMS MAP_KEY (default: env FIRMS_MAP_KEY / .env)")
         sp.add_argument("--bbox", nargs=4, type=float, metavar=("W", "S", "E", "N"),
@@ -1224,12 +1333,17 @@ def main():
             sp.add_argument("--tag", default="",
                             help="experiment name: saves models/fire_model_<tag>.joblib and <out>/exp_<tag>/ "
                                  "instead of replacing the production model")
+        elif name == "climate":
+            sp.add_argument("--days", type=int, default=760, help="history to use (two full years need 760)")
+            sp.add_argument("--reuse", action="store_true", help="reuse the saved monthly tables (skips reading the fire files)")
         else:
             sp.add_argument("--every", type=float, default=0, help="repeat every N hours (near-real-time mode)")
             sp.add_argument("--analytics", action="store_true", help="also refresh the 7-day analytics charts")
     args = ap.parse_args()
     if args.cmd == "backtest":
         cmd_backtest(args)
+    elif args.cmd == "climate":
+        cmd_climate(args)
     elif args.cmd == "train":
         cmd_train(args)
     elif args.every > 0:
