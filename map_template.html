@@ -138,6 +138,24 @@ body.picking .leaflet-container { cursor:crosshair; }
   .leaflet-control-attribution { font-size:9px; }
 }
 @media (prefers-reduced-motion:reduce) { .cells-glow { animation:none; } .leaflet-cells-pane { transition:none; } }
+
+/* Spread direction layer: distinct from the probability heatmap. */
+.spread-controls { display:grid; gap:7px; }
+.spread-controls .field { margin:0; }
+.spread-controls select { min-width:0; width:100%; }
+.spread-controls .field > span { width:72px; }
+.spread-status { margin:7px 0; font-size:12px; color:var(--muted); }
+.spread-actions { display:flex; gap:6px; }
+.spread-selected { border-left:3px solid #a855f7; padding:8px; margin-top:8px; background:var(--hover); border-radius:4px; }
+.spread-selected h3 { margin:0 0 5px; font-size:13px; }
+.spread-list { display:grid; gap:3px; margin-top:6px; }
+.spread-list button { text-align:left; padding:6px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--fg); cursor:pointer; font:inherit; font-size:12px; }
+.spread-list button:hover,.spread-list button:focus-visible { background:var(--hover); outline:2px solid #a855f7; }
+.spread-key { color:#c084fc; font-size:17px; }
+body:not(.dark) .spread-key { color:#6d28d9; }
+.spread-canvas { position:absolute; pointer-events:none; }
+.spread-unavailable { color:var(--hot); }
+
 </style></head>
 <body class="dark">
 <div id="map"></div>
@@ -149,13 +167,15 @@ body.picking .leaflet-container { cursor:crosshair; }
   </div>
   <div class="body">
     <section class="summary">
-      <div><b class="num" id="sExp">–</b> squares expected to burn</div>
+      <h2>Worldwide forecast totals</h2>
+      <div><b class="num" id="sExp">–</b> cells expected to have fire</div>
       <div class="hint"><span class="num" id="sCells">–</span> squares shown, each about <span id="km"></span> km wide</div>
+      <div class="spread-actions" style="margin-top:8px"><button class="btn" id="view-ireland">Ireland</button><button class="btn" id="view-world">World</button></div>
     </section>
 
     <section>
       <h2>Show probability from <span class="num" id="thrVal">1%</span></h2>
-      <input type="range" id="thr" min="0" max="15" step="1" value="0" aria-label="Minimum fire probability">
+      <input type="range" id="thr" min="0" max="17" step="1" value="0" aria-label="Minimum fire probability">
       <div class="ticks"><span>1%</span><span>10%</span><span>40%</span><span>90%</span></div>
     </section>
 
@@ -168,6 +188,22 @@ body.picking .leaflet-container { cursor:crosshair; }
       <label class="check"><input type="checkbox" id="fresh">Only new fire areas<small id="nFresh"></small></label>
       <div class="hint"><span class="key"></span> No fire within ~100 km for 7 days</div>
       <label class="check"><input type="checkbox" id="dets">Fires seen by satellite, last 24 h<small id="nDets"></small></label>
+    </section>
+
+
+    <section id="spread-section" aria-label="Wind and fire spread">
+      <h2><span class="spread-key" aria-hidden="true">&#8599;</span> Wind &amp; fire spread</h2>
+      <div class="spread-controls">
+        <label class="check"><input type="checkbox" id="spread-enabled" checked>Show direction arrows</label>
+        <label class="field"><span>Source</span><select id="spread-source" aria-label="Spread source"><option value="combined">World + regional scenarios</option><option value="ireland">Ireland scenarios only</option><option value="europe">UK / Spain / France scenarios</option><option value="active">Active fires only</option><option value="scenario">Top-50 new-ignition scenarios</option></select></label>
+        <label class="field"><span>Arrows</span><select id="spread-kind" aria-label="Direction type"><option value="spread">Estimated fire spread</option><option value="wind">Wind blows toward</option></select></label>
+        <label class="field"><span>Horizon</span><select id="spread-hour" aria-label="Spread forecast horizon"><option value="6">+6 hours</option><option value="12">+12 hours</option><option value="18">+18 hours</option><option value="24" selected>+24 hours</option></select></label>
+      </div>
+      <p id="spread-status" class="spread-status" role="status" aria-live="polite">Loading spread snapshot...</p>
+      <div class="hint">Arrows follow the probability and new-area filters. Scenarios show spread if a fire occurs; they are not confirmed fires. Select a horizon to see the forecast wind change.</div>
+      <div class="spread-actions"><button class="btn" id="spread-refresh">Refresh</button><button class="btn" id="spread-locate">Find a fire</button></div>
+      <div id="spread-selected" class="spread-selected" hidden></div>
+      <details style="margin-top:8px"><summary>Browse fires</summary><div class="spread-list" id="spread-list"></div></details>
     </section>
 
     <section>
@@ -242,7 +278,7 @@ const B = __BORDERS__;
 const META = __META__;
 const RISK = __COLORS__;
 const RES = __RES__, H = RES / 2;
-const STEPS = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90];
+const STEPS = [1, 1.25, 1.5, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90];
 const CLASSES = [["Low", "under 10%", 0], ["Moderate", "10–30%", .1], ["High", "30–60%", .3], ["Very high", "over 60%", .6]];
 const BASES = {
   dark: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
@@ -269,7 +305,7 @@ const theme = () => BASES[state.base][2];
 // ---- data: columns -> typed arrays ---------------------------------------------------
 const N = D.lat.length, K = D.p.length, NX = Math.round(360 / RES), NY = Math.round(180 / RES);
 const CI = new Int32Array(N), CJ = new Int32Array(N), FR = Uint8Array.from(D.fresh), CT = Int32Array.from(D.cty);
-const PK = D.p.map(a => Float32Array.from(a, v => v / 1000));
+const PK = D.p.map(a => Float64Array.from(a, v => v / (D.probability_scale || 1000)));
 const lookup = new Map();
 for (let i = 0; i < N; i++) {
   CI[i] = Math.floor((D.lat[i] + 90) / RES); CJ[i] = Math.floor((D.lon[i] + 180) / RES);
@@ -330,7 +366,7 @@ const colourOf = p => `rgb(${SOLID[bucketOf(Math.max(p, .01))]})`;
 
 // ---- map ----------------------------------------------------------------------------
 const map = L.map('map', {worldCopyJump: true, zoomControl: false, minZoom: 2, zoomAnimation: false, markerZoomAnimation: false})
-  .setView(phone.matches ? [8, 20] : [14, 18], phone.matches ? 2 : 3);
+  .setView([53.4, -8], phone.matches ? 6 : 7);
 L.control.zoom({position: 'bottomright'}).addTo(map);
 const credit = ' | Fire data: NASA FIRMS | Weather: NOAA GFS';
 let baseLayer = null;
@@ -455,7 +491,7 @@ function applyBase() {
   document.body.classList.toggle('dark', theme() === 'dark');
   borderLine.setStyle({color: theme() === 'dark' ? '#ffffff' : '#334155', opacity: theme() === 'dark' ? 0.22 : 0.35});
   hl.setStyle({color: outline()});
-  buildColours(); dirty = true;
+  buildColours(); dirty = true; window.dispatchEvent(new Event('spread-theme'));
 }
 function applyOverlays() {
   state.borders ? borderLine.addTo(map) : map.removeLayer(borderLine);
@@ -483,9 +519,9 @@ function popupHtml(i, k) {
     <div class="pop-place">${D.countries[CT[i]]}, ${Math.abs(D.lat[i]).toFixed(2)}°${ns} ${Math.abs(D.lon[i]).toFixed(2)}°${ew}</div>
     ${bars}
     <table>
-      <tr><td>Max temperature</td><td>${(D.tmax[k][i] / 10).toFixed(1)} °C</td></tr>
-      <tr><td>Min humidity</td><td>${D.rh[k][i]}%</td></tr>
-      <tr><td>Max wind</td><td>${(D.wind[k][i] / 10).toFixed(1)} m/s</td></tr>
+      <tr><td>Max temperature</td><td>${D.tmax[k][i] == null ? 'Not available' : (D.tmax[k][i] / 10).toFixed(1) + ' °C'}</td></tr>
+      <tr><td>Min humidity</td><td>${D.rh[k][i] == null ? 'Not available' : D.rh[k][i] + '%'}</td></tr>
+      <tr><td>Max wind</td><td>${D.wind[k][i] == null ? 'Not available' : (D.wind[k][i] / 10).toFixed(1) + ' m/s'}</td></tr>
       <tr><td>Rain, last 7 days</td><td>${(D.rain7[i] / 10).toFixed(1)} mm</td></tr>
       <tr><td>Days since rain</td><td>${D.dsr[i]}</td></tr>
       <tr><td>Fires seen, last 24 h</td><td>${D.det[i]}</td></tr>
@@ -531,6 +567,7 @@ function timeUI() {
   const k = dayNow();
   if (k === shownDay) return;
   shownDay = k;
+  window.FireSpreadLayer?.refresh();
   $('tbDate').textContent = days[k].title;
   $('tbSub').textContent = `${days[k].span} · day ${k + 1} of ${K}`;
   document.querySelectorAll('#days button').forEach((b, j) => b.classList.toggle('on', j === k));
@@ -550,7 +587,7 @@ function frame(now) {
   const moved = tick(dt);
   if (moved || dirty) {
     const full = !moved || now - lastFull > 220;
-    dirty = false; draw(); stats(full); timeUI();
+    dirty = false; draw(); stats(full); timeUI(); window.FireSpreadLayer?.refresh();
     if (full) lastFull = now;
     if (!moved) lastFull = 0;
   }
@@ -647,4 +684,210 @@ setPlaying(false);
 requestAnimationFrame(now => { last = now; frame(now); applyOverlays(); });   // first draw, then fade the squares in
 if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
 </script>
+
+<script type="application/json" id="spread-payload">{}</script>
+<script>
+(() => {
+  'use strict';
+  const el = id => document.getElementById(id);
+  const ui = {enabled:el('spread-enabled'),source:el('spread-source'),kind:el('spread-kind'),hour:el('spread-hour'),
+              status:el('spread-status'),selected:el('spread-selected'),list:el('spread-list')};
+  const snapshots = {};
+  let selected = null, spreadPopup = null, drawn = [], scheduled = false, failure = '', loading = false;
+  const spreadPane = map.createPane('spreadDirections');
+  spreadPane.style.zIndex = 430; spreadPane.style.pointerEvents = 'none';
+  const canvas = L.DomUtil.create('canvas','spread-canvas',spreadPane);
+  canvas.setAttribute('aria-hidden','true');
+  const context = canvas.getContext('2d');
+  const h = () => Number(ui.hour.value);
+  const dataset = () => snapshots[ui.source.value];
+  const frameOf = f => f.properties.frames.find(x => x.hour === h());
+  const direction = frame => frame?.[ui.kind.value === 'wind' ? 'wind_bearing_deg' : 'spread_bearing_deg'];
+  const finiteNumber = x => typeof x === 'number' && Number.isFinite(x);
+  const compass = b => finiteNumber(b) ? `${Math.round(b)}\u00b0 ${['N','NE','E','SE','S','SW','W','NW'][Math.round(b/45)%8]}` : 'Direction unavailable';
+  const dateLabel = value => new Date(value).toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC';
+  const escape = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function aligned() { return dataset() && dataset().metadata.issued_at_utc === META.days[0].from; }
+  function eligible() { return ui.enabled.checked && aligned() && dayNow()===0; }
+  function project(coordinates) {
+    const longitude = coordinates[0] + 360*Math.round((map.getCenter().lng-coordinates[0])/360);
+    return map.latLngToContainerPoint([coordinates[1],longitude]);
+  }
+  function setPayload(source,payload) {
+    if (!payload || payload.type!=='FeatureCollection' || payload.metadata?.schema_version!==1 || !Array.isArray(payload.features)) throw new Error('Unsupported spread snapshot');
+    payload.features = payload.features.filter(f=>f.geometry?.type==='Point' && f.geometry.coordinates.every(finiteNumber) && Array.isArray(f.properties?.frames));
+    payload.features.sort((a,b)=>(b.properties.n_points-a.properties.n_points) || ((b.properties.probability||0)-(a.properties.probability||0)) || b.properties.frp_sum-a.properties.frp_sum);
+    snapshots[source] = payload;
+    if (['active','ireland','europe'].includes(source)) {
+      const active=snapshots.active,ireland=snapshots.ireland,europe=snapshots.europe;
+      delete snapshots.combined;
+      if (active && ireland && europe && active.metadata.issued_at_utc===ireland.metadata.issued_at_utc && active.metadata.issued_at_utc===europe.metadata.issued_at_utc) {
+        // Keep the regional scenarios intact and avoid overlapping active arrows in their cells.
+        const regional=[...ireland.features,...europe.features];
+        const regionalCells=new Set(regional.map(cellIndex).filter(i=>i!==undefined));
+        const features=[...regional,...active.features.filter(f=>!regionalCells.has(cellIndex(f)))];
+        snapshots.combined={type:'FeatureCollection',metadata:{...active.metadata,source:'combined',feature_count:features.length},features};
+      }
+    }
+    if (source===ui.source.value||ui.source.value==='combined') { selected=null; renderList(); requestDraw(); }
+  }
+  function renderList() {
+    ui.list.replaceChildren();
+    const available=(dataset()?.features||[]).filter(matchesFilters);
+    for (const feature of available.slice(0,8)) {
+      const button=document.createElement('button'); button.type='button';
+      const p=feature.properties;
+      button.textContent=p.source==='active' ? `Fire #${p.cluster_id} | ${fmt(p.n_points)} detections` : `${feature.id.startsWith('ireland-')?'Ireland':p.country||'Ignition'} scenario #${p.cluster_id} | ${pct(p.probability)} probability`;
+      button.onclick=()=>selectFeature(feature.id,true); ui.list.append(button);
+    }
+    if (!available.length) ui.list.textContent='No candidates match the probability and new-area filters.';
+  }
+  function cellIndex(feature) {
+    const [lon,lat]=feature.geometry.coordinates;
+    return lookup.get(Math.floor((lat+90)/RES)*NX+Math.floor((lon+180)/RES));
+  }
+  function probabilityAt(feature) {
+    const index=cellIndex(feature);
+    return index===undefined ? null : pAt(index);
+  }
+  function matchesFilters(feature) {
+    const index=cellIndex(feature);
+    return index!==undefined && eligibleP(index,pAt(index));
+  }
+  function detailHtml(feature) {
+    const p=feature.properties, frame=frameOf(feature), probability=probabilityAt(feature);
+    if (!frame) return 'No forecast for this horizon.';
+    const source=p.source==='active' ? `Active fire #${p.cluster_id}` : `${feature.id.startsWith('ireland-')?'Ireland':p.country||'Ignition'} scenario #${p.cluster_id}`;
+    const provenance=snapshots[feature.id.split('-')[0]]?.metadata||dataset().metadata;
+    const model=p.direction_model==='wind_persistence' ? 'Wind + previous spread' : 'Wind-only fallback';
+    return `<h3>${escape(source)} | +${h()}h</h3><div class="hint">${escape(dateLabel(frame.valid_at_utc))}</div><table>
+      <tr><td>Cell fire probability</td><td>${probability===null?'Not available':(probability*100).toFixed(2)+'%'}</td></tr>
+      ${p.country?`<tr><td>Country in forecast</td><td>${escape(p.country)}</td></tr>`:''}
+      <tr><td>Wind blows toward</td><td>${compass(frame.wind_bearing_deg)}</td></tr>
+      <tr><td>Wind speed</td><td>${frame.wind_speed_ms.toFixed(2)} m/s</td></tr>
+      <tr><td>Weather source</td><td>NOAA GFS, 10 m wind</td></tr>
+      <tr><td>GFS forecast cycle</td><td>${escape(dateLabel(provenance.gfs_cycle_utc))}</td></tr>
+      <tr><td>Estimated spread toward</td><td>${compass(frame.spread_bearing_deg)}</td></tr>
+      <tr><td>Head-fire travel</td><td>${frame.cumulative_head_distance_km.toFixed(2)} km</td></tr>
+      <tr><td>Satellite detections</td><td>${fmt(p.n_points)}</td></tr></table>
+      <div class="hint">Cached weather forecast, not live station readings. ${p.source==='scenario'?'Conditional on a fire occurring. ':''}${model}. Travel is a heuristic estimate, not a burned perimeter.</div>`;
+  }
+  function selectFeature(id,focus=false) {
+    selected=dataset()?.features.find(f=>f.id===id)||null;
+    if (!selected || !matchesFilters(selected)) {selected=null;requestDraw();return;}
+    ui.selected.hidden=false; ui.selected.innerHTML=detailHtml(selected);
+    if (focus) {
+      if (dayNow()!==0) { setPlaying(false,true); t=0; dirty=true; }
+      map.setView([selected.geometry.coordinates[1],selected.geometry.coordinates[0]],Math.max(10,map.getZoom()));
+      if (phone.matches) map.panBy([0,Math.round(map.getSize().y*.22)],{animate:false});
+    }
+    requestDraw();
+  }
+  function drawArrow(x,y,bearing,color,active) {
+    context.save();context.translate(x,y);context.rotate(bearing*Math.PI/180);
+    context.lineCap='round';context.lineJoin='round';
+    context.beginPath();context.moveTo(0,8);context.lineTo(0,-8);
+    context.strokeStyle='#24143f';context.lineWidth=active?6:5;context.stroke();
+    context.strokeStyle=color;context.lineWidth=active?3:2;context.stroke();
+    context.beginPath();context.moveTo(0,-11);context.lineTo(-4,-4);context.lineTo(4,-4);context.closePath();
+    context.strokeStyle='#24143f';context.lineWidth=2.5;context.stroke();context.fillStyle=color;context.fill();
+    context.strokeStyle=color;
+    if (active) {context.beginPath();context.arc(0,0,15,0,Math.PI*2);context.lineWidth=1;context.stroke();}
+    context.restore();
+  }
+  function draw() {
+    scheduled=false;
+    const size=map.getSize(),dpr=Math.min(devicePixelRatio||1,2);
+    canvas.width=Math.round(size.x*dpr);canvas.height=Math.round(size.y*dpr);
+    canvas.style.width=size.x+'px';canvas.style.height=size.y+'px';
+    L.DomUtil.setPosition(canvas,map.containerPointToLayerPoint([0,0]));
+    context.setTransform(dpr,0,0,dpr,0,0);context.clearRect(0,0,size.x,size.y);drawn=[];
+    const data=dataset();
+    if(selected && !matchesFilters(selected)) {selected=null;if(spreadPopup){map.removeLayer(spreadPopup);spreadPopup=null;}}
+    renderList();
+    ui.selected.hidden=!selected || !eligible();
+    if (selected && eligible()) { ui.selected.innerHTML=detailHtml(selected); if(spreadPopup && map.hasLayer(spreadPopup)) spreadPopup.setContent(detailHtml(selected)); }
+    if (!eligible() && spreadPopup) {map.removeLayer(spreadPopup);spreadPopup=null;}
+    if (loading) {ui.status.textContent='Loading spread snapshot...';return;}
+    if (!data) {ui.status.textContent=failure||'Spread forecast unavailable.';return;}
+    if (!aligned()) {ui.status.textContent='Spread snapshot belongs to a different forecast time.';return;}
+    if (dayNow()!==0) {ui.status.textContent='Spread is available for the first 24 hours only. Select the first forecast day.';return;}
+    if (!ui.enabled.checked) {ui.status.textContent='Direction arrows hidden.';return;}
+    const color=ui.kind.value==='wind' ? (theme()==='dark'?'#67e8f9':'#087e96') : (theme()==='dark'?'#d8b4fe':'#6d28d9');
+    const occupied=new Set(); let candidates=0;
+    const ordered=selected ? [selected,...data.features.filter(f=>f.id!==selected.id)] : data.features;
+    for (const feature of ordered) {
+      if (!matchesFilters(feature)) continue;
+      const frame=frameOf(feature),bearing=direction(frame);
+      if (!finiteNumber(bearing)) continue;
+      const point=project(feature.geometry.coordinates);
+      if (point.x<12||point.y<12||point.x>size.x-12||point.y>size.y-12) continue;
+      candidates++;
+      const cell=`${Math.floor(point.x/27)}:${Math.floor(point.y/27)}`;
+      if (occupied.has(cell)||drawn.length>=500) continue;
+      occupied.add(cell);
+      if (ui.kind.value==='spread' && (map.getZoom()>=9 || selected?.id===feature.id)) {
+        context.beginPath();context.moveTo(point.x,point.y);
+        for (const step of feature.properties.frames) {
+          if (step.hour>h()||!step.head_position) break;
+          const end=project(step.head_position); context.lineTo(end.x,end.y);
+        }
+        context.strokeStyle=color;context.globalAlpha=.65;context.lineWidth=selected?.id===feature.id?3:1.5;context.stroke();context.globalAlpha=1;
+      }
+      drawArrow(point.x,point.y,bearing,color,selected?.id===feature.id);
+      drawn.push({feature,x:point.x,y:point.y});
+    }
+    const valid=new Date(data.metadata.issued_at_utc);valid.setUTCHours(valid.getUTCHours()+h());
+    const matching=data.features.filter(matchesFilters).length;
+    const sourceLabel=ui.source.value==='combined'?'active fires + regional scenarios':ui.source.value==='active'?'active fires':'scenarios';
+    ui.status.textContent=`${drawn.length} arrows shown | ${fmt(matching)}/${fmt(data.features.length)} ${sourceLabel} match filters | ${dateLabel(valid.toISOString())}.`+
+      (!matching?' No arrows meet the current filters. Lower the probability threshold or turn off Only new fire areas.':'')+
+      (ui.source.value==='ireland'?' Island of Ireland, including Northern Ireland; cached forecast cells only.':'')+
+      (candidates>drawn.length?' Zoom in to separate nearby arrows.':'')+(failure?' Showing saved snapshot; refresh failed.':'');
+  }
+  function requestDraw() { if (!scheduled) {scheduled=true;requestAnimationFrame(draw);} }
+  async function load(source,force=false) {
+    if (snapshots[source]&&!force) {renderList();requestDraw();return;}
+    if (location.protocol==='file:') {failure='Open a refreshed map file to update this saved snapshot.';requestDraw();return;}
+    loading=true;failure='';requestDraw();
+    try {
+      const sources=source==='combined'?['active','ireland','europe']:[source];
+      let savedPage=null;
+      const updates=await Promise.all(sources.map(async name=>{
+        for (const url of [`/api/spread?source=${name}`,`../spread/spread_${name}.geojson`]) {
+          try { const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(10000)});if(response.ok) return [name,await response.json()]; } catch(error) {}
+        }
+        // Static hosting and an older running local server can still serve rebuilt HTML.
+        savedPage ||= fetch(location.href,{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(r=>{
+          if(!r.ok)throw new Error('missing map');return r.text();
+        }).then(html=>JSON.parse(new DOMParser().parseFromString(html,'text/html').getElementById('spread-payload').textContent));
+        const embedded=(await savedPage)[name];if(embedded)return [name,embedded];
+        throw new Error('missing');
+      }));
+      for(const [name,payload] of updates)setPayload(name,payload);
+    } catch(error) {failure='Spread forecast unavailable. Use Refresh to retry.';}
+    finally {loading=false;requestDraw();}
+  }
+  ui.source.onchange=()=>{selected=null;if(spreadPopup){map.removeLayer(spreadPopup);spreadPopup=null;}renderList();load(ui.source.value);};
+  ui.kind.onchange=ui.hour.onchange=ui.enabled.onchange=requestDraw;
+  el('spread-refresh').onclick=()=>load(ui.source.value,true);
+  el('spread-locate').onclick=()=>{const feature=dataset()?.features.find(f=>matchesFilters(f)&&finiteNumber(direction(frameOf(f))));if(feature)selectFeature(feature.id,true);};
+  el('view-ireland').onclick=()=>map.setView([53.4,-8],phone.matches?6:7);
+  el('view-world').onclick=()=>map.setView([14,18],phone.matches?2:3);
+  map.on('move zoom resize',requestDraw);window.addEventListener('spread-theme',requestDraw);
+  map.on('click',event=>{
+    if(picking()||!eligible())return;
+    const point=map.latLngToContainerPoint(event.latlng);
+    const hit=drawn.find(d=>Math.hypot(d.x-point.x,d.y-point.y)<=15);
+    if(hit) {selectFeature(hit.feature.id);spreadPopup=L.popup({maxWidth:330}).setLatLng(event.latlng).setContent(detailHtml(hit.feature)).openOn(map);}
+  });
+  window.FireSpreadLayer={setPayload,refresh:requestDraw,selectFeature,getState:()=>({source:ui.source.value,hour:h(),kind:ui.kind.value,
+    selectedId:selected?.id||null,visibleArrows:drawn.length,featureCount:dataset()?.features.length||0,
+    matchingFeatures:(dataset()?.features||[]).filter(matchesFilters).length,
+    drawn:drawn.map(d=>({id:d.feature.id,probability:probabilityAt(d.feature),bearing:direction(frameOf(d.feature))})),eligible:!!eligible()})};
+  try {const embedded=JSON.parse(el('spread-payload').textContent);for(const source of ['active','scenario','ireland','europe'])if(embedded[source])setPayload(source,embedded[source]);}catch(error){failure='Saved spread snapshot could not be read.';}
+  renderList();load(ui.source.value);
+})();
+</script>
+
 </body></html>

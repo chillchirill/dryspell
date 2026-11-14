@@ -307,3 +307,154 @@ def weather_features(window: dict, past: dict, lat, lon) -> pd.DataFrame:
 
 WEATHER_FEATURES = ["tmax", "tmean", "rhmin", "rhmean", "vpdmax", "wsmax", "wsmean", "gustmax",
                     "precip_24h", "soilw", "precip_7d", "precip_30d", "days_since_rain", "tmax_anom"]
+
+
+
+def wind_uv(cycle: pd.Timestamp, steps: list[int], workers: int = 6) -> dict:
+    """Fetch ONLY 10 m UGRD/VGRD, preserving steps on the 361 x 720 grid.
+
+    u/v are eastward/northward m/s; download_bytes counts GRIB payload bytes
+    (index responses and HTTP overhead are excluded). No daily fields fetched.
+    """
+    cycle = pd.Timestamp(cycle)
+    if cycle.tzinfo is not None:
+        cycle = cycle.tz_convert("UTC").tz_localize(None)
+    steps = list(steps)
+    if not steps or any(int(s) != s or s < 0 for s in steps):
+        raise ValueError("steps must be nonnegative integer forecast hours")
+    levels = dict(STEP_VARS)
+    urls = {st: grib_url(cycle, st) for st in steps}
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            indices = dict(zip(urls, ex.map(lambda st: _read_idx(urls[st]), urls)))
+        if any(idx is None for idx in indices.values()):
+            raise MissingGFS(f"U/V indices unavailable: {cycle:%Y-%m-%d %HZ}")
+        jobs = [(var, st, *_locate(indices[st], var, levels[var]))
+                for st in dict.fromkeys(steps) for var in ("UGRD", "VGRD")]
+
+        def read(job):
+            var, st, start, end = job
+            if end is None:
+                raise MissingGFS("Cannot bound U/V message byte range")
+            msg = _fetch(urls[st], start, end)
+            if len(msg) != end - start + 1:
+                raise MissingGFS("GFS response did not match requested U/V byte range")
+            values = _decode(msg)
+            if values.shape != (361, 720) or not np.isfinite(values).all():
+                raise MissingGFS("Invalid U/V grid")
+            return (var, st), values, len(msg)
+
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            results = list(ex.map(read, jobs))
+    except requests.RequestException as exc:
+        raise MissingGFS(f"U/V request failed: {cycle:%Y-%m-%d %HZ}") from exc
+    fields = {key: value for key, value, _ in results}
+    return {"u": np.stack([fields[("UGRD", st)] for st in steps]),
+            "v": np.stack([fields[("VGRD", st)] for st in steps]),
+            "download_bytes": sum(size for _, _, size in results)}
+
+
+def _save_uv_cache(path: Path, fields: dict) -> None:
+    """Atomically save vector arrays; incomplete downloads never become caches."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".npz.part")
+    with tmp.open("wb") as handle:
+        np.savez_compressed(handle, u=fields["u"].astype(np.float16),
+                            v=fields["v"].astype(np.float16))
+    tmp.replace(path)
+
+
+def ensure_daily_uv(days, cache: Path = Path("data/gfs_uv"),
+                    parallel_days: int = 3) -> list[pd.Timestamp]:
+    """Cache D 00Z..D+1 00Z U/V from cycle D-1 12Z; return unavailable days.
+
+    Existing files are skipped. The first successful new day is timed before
+    the remaining batch, with measured payload/cache MB and a 100-day estimate.
+    """
+    import time
+
+    cache = Path(cache)
+    cache.mkdir(parents=True, exist_ok=True)
+    days = sorted({pd.Timestamp(d).normalize().tz_localize(None) for d in days})
+    todo = [d for d in days if not (cache / f"uv_day_{d:%Y%m%d}.npz").exists()]
+    missing = []
+    if not todo:
+        return missing
+
+    def one(day):
+        started = time.perf_counter()
+        try:
+            fields = wind_uv(day - pd.Timedelta(hours=12), [12, 18, 24, 30, 36])
+        except MissingGFS:
+            return day, None
+        path = cache / f"uv_day_{day:%Y%m%d}.npz"
+        _save_uv_cache(path, fields)
+        return day, (fields["download_bytes"], path.stat().st_size,
+                     time.perf_counter() - started)
+
+    print(f"U/V cache: {len(todo)} uncached day(s); measuring one day first.", flush=True)
+    while todo:
+        day, measured = one(todo.pop(0))
+        if measured is None:
+            missing.append(day)
+            print(f"  unavailable: {day:%Y-%m-%d}", flush=True)
+            continue
+        payload, disk, elapsed = measured
+        print(f"U/V pilot {day:%Y-%m-%d}: GRIB payload {payload / 1e6:.3f} MB; "
+              f"cache {disk / 1e6:.3f} MB; {elapsed:.2f} s", flush=True)
+        print(f"100-day estimate from pilot: {payload * 100 / 1e6:.1f} MB payload, "
+              f"{disk * 100 / 1e6:.1f} MB disk, {elapsed * 100 / 60:.1f} min serial "
+              "(excludes index/HTTP overhead; throughput may vary).", flush=True)
+        break
+    with ThreadPoolExecutor(max_workers=parallel_days) as ex:
+        for count, (day, measured) in enumerate(ex.map(one, todo), 1):
+            if measured is None:
+                missing.append(day)
+                print(f"  unavailable: {day:%Y-%m-%d}", flush=True)
+            if count % 10 == 0 or count == len(todo):
+                print(f"  U/V batch {count}/{len(todo)}", flush=True)
+    return sorted(missing)
+
+
+def latest_wind_uv(tau: pd.Timestamp, cache: Path = Path("data/gfs_uv")):
+    """Newest published cycle, U/V only, interpolated to tau+[0,6,12,18,24]h.
+
+    Like latest_window, search cycles backwards at six-hour intervals up to
+    48h. Bracket tau instead of shifting its start forward to a forecast step.
+    Exact cycle/step caches are reused by subsequent active/scenario runs.
+    """
+    tau = pd.Timestamp(tau)
+    if tau.tzinfo is not None:
+        tau = tau.tz_convert("UTC").tz_localize(None)
+    cache = Path(cache)
+    for back in range(0, 49, 6):
+        cycle = tau.floor("6h") - pd.Timedelta(hours=back)
+        offset = (tau - cycle) / pd.Timedelta(hours=1)
+        first = int(np.floor(offset / 3)) * 3
+        steps = list(range(first, first + 25, 6))
+        if steps[-1] < offset + 24:
+            steps.append(steps[-1] + 6)
+        path = cache / f"uv_cycle_{cycle:%Y%m%dT%H}_{steps[0]:03d}_{steps[-1]:03d}.npz"
+        try:
+            if path.exists():
+                with np.load(path, allow_pickle=False) as z:
+                    fields = {k: z[k].astype(np.float32) for k in ("u", "v")}
+            else:
+                response = _session.head(grib_url(cycle, steps[-1]) + ".idx", timeout=30)
+                if response.status_code != 200:
+                    continue
+                fields = wind_uv(cycle, steps)
+                _save_uv_cache(path, fields)
+            targets = offset + np.arange(0, 25, 6)
+            result = {}
+            for key in ("u", "v"):
+                arrays = []
+                for target in targets:
+                    lo = min(int((target - first) // 6), len(steps) - 2)
+                    weight = (target - steps[lo]) / 6
+                    arrays.append((1 - weight) * fields[key][lo] + weight * fields[key][lo + 1])
+                result[key] = np.stack(arrays)
+            return result, cycle
+        except (MissingGFS, requests.RequestException):
+            continue
+    raise MissingGFS(f"no U/V cycle covers {tau}")
