@@ -1,0 +1,445 @@
+- main [ref=e1]:
+  - link "Skip to object tools" [ref=e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Terrain map" [ref=e3]:
+    - generic:
+      - region "Map" [ref=e4]
+      - button "Sensor 01" [ref=e1089] [cursor=pointer]:
+        - generic [ref=e1094]:
+          - strong [ref=e1095]: Sensor 01
+          - generic [ref=e1096]:
+            - generic [ref=e1097]: Temp
+            - generic [ref=e1098]: No reading
+          - generic [ref=e1099]:
+            - generic [ref=e1100]: Humidity
+            - generic [ref=e1101]: No reading
+          - generic [ref=e1102]:
+            - generic [ref=e1103]: Smoke
+            - generic [ref=e1104]: No reading
+      - button "Sensor 02" [ref=e1105] [cursor=pointer]:
+        - generic [ref=e1110]:
+          - strong [ref=e1111]: Sensor 02
+          - generic [ref=e1112]:
+            - generic [ref=e1113]: Temp
+            - generic [ref=e1114]: No reading
+          - generic [ref=e1115]:
+            - generic [ref=e1116]: Humidity
+            - generic [ref=e1117]: No reading
+          - generic [ref=e1118]:
+            - generic [ref=e1119]: Smoke
+            - generic [ref=e1120]: No reading
+      - button "Sensor 03" [ref=e1121] [cursor=pointer]:
+        - generic [ref=e1126]:
+          - strong [ref=e1127]: Sensor 03
+          - generic [ref=e1128]:
+            - generic [ref=e1129]: Temp
+            - generic [ref=e1130]: No reading
+          - generic [ref=e1131]:
+            - generic [ref=e1132]: Humidity
+            - generic [ref=e1133]: No reading
+          - generic [ref=e1134]:
+            - generic [ref=e1135]: Smoke
+            - generic [ref=e1136]: No reading
+      - button "Sensor 04" [ref=e1137] [cursor=pointer]:
+        - generic [ref=e1142]:
+          - strong [ref=e1143]: Sensor 04
+          - generic [ref=e1144]:
+            - generic [ref=e1145]: Temp
+            - generic [ref=e1146]: No reading
+          - generic [ref=e1147]:
+            - generic [ref=e1148]: Humidity
+            - generic [ref=e1149]: No reading
+          - generic [ref=e1150]:
+            - generic [ref=e1151]: Smoke
+            - generic [ref=e1152]: No reading
+      - button "Sensor 05" [ref=e1153] [cursor=pointer]:
+        - generic [ref=e1158]:
+          - strong [ref=e1159]: Sensor 05
+          - generic [ref=e1160]:
+            - generic [ref=e1161]: Temp
+            - generic [ref=e1162]: No reading
+          - generic [ref=e1163]:
+            - generic [ref=e1164]: Humidity
+            - generic [ref=e1165]: No reading
+          - generic [ref=e1166]:
+            - generic [ref=e1167]: Smoke
+            - generic [ref=e1168]: No reading
+      - button "Sensor 06" [ref=e1169] [cursor=pointer]:
+        - generic [ref=e1174]:
+          - strong [ref=e1175]: Sensor 06
+          - generic [ref=e1176]:
+            - generic [ref=e1177]: Temp
+            - generic [ref=e1178]: No reading
+          - generic [ref=e1179]:
+            - generic [ref=e1180]: Humidity
+            - generic [ref=e1181]: No reading
+          - generic [ref=e1182]:
+            - generic [ref=e1183]: Smoke
+            - generic [ref=e1184]: No reading
+      - button "Sensor 07" [ref=e1185] [cursor=pointer]:
+        - generic [ref=e1190]:
+          - strong [ref=e1191]: Sensor 07
+          - generic [ref=e1192]:
+            - generic [ref=e1193]: Temp
+            - generic [ref=e1194]: No reading
+          - generic [ref=e1195]:
+            - generic [ref=e1196]: Humidity
+            - generic [ref=e1197]: No reading
+          - generic [ref=e1198]:
+            - generic [ref=e1199]: Smoke
+            - generic [ref=e1200]: No reading
+      - button "Sensor 08" [ref=e1201] [cursor=pointer]:
+        - generic [ref=e1206]:
+          - strong [ref=e1207]: Sensor 08
+          - generic [ref=e1208]:
+            - generic [ref=e1209]: Temp
+            - generic [ref=e1210]: No reading
+          - generic [ref=e1211]:
+            - generic [ref=e1212]: Humidity
+            - generic [ref=e1213]: No reading
+          - generic [ref=e1214]:
+            - generic [ref=e1215]: Smoke
+            - generic [ref=e1216]: No reading
+      - button "Sensor 09" [ref=e1217] [cursor=pointer]:
+        - generic [ref=e1222]:
+          - strong [ref=e1223]: Sensor 09
+          - generic [ref=e1224]:
+            - generic [ref=e1225]: Temp
+            - generic [ref=e1226]: No reading
+          - generic [ref=e1227]:
+            - generic [ref=e1228]: Humidity
+            - generic [ref=e1229]: No reading
+          - generic [ref=e1230]:
+            - generic [ref=e1231]: Smoke
+            - generic [ref=e1232]: No reading
+      - button "Sensor 10" [ref=e1233] [cursor=pointer]:
+        - generic [ref=e1238]:
+          - strong [ref=e1239]: Sensor 10
+          - generic [ref=e1240]:
+            - generic [ref=e1241]: Temp
+            - generic [ref=e1242]: No reading
+          - generic [ref=e1243]:
+            - generic [ref=e1244]: Humidity
+            - generic [ref=e1245]: No reading
+          - generic [ref=e1246]:
+            - generic [ref=e1247]: Smoke
+            - generic [ref=e1248]: No reading
+      - button "Sensor 11" [ref=e1249] [cursor=pointer]:
+        - generic [ref=e1254]:
+          - strong [ref=e1255]: Sensor 11
+          - generic [ref=e1256]:
+            - generic [ref=e1257]: Temp
+            - generic [ref=e1258]: No reading
+          - generic [ref=e1259]:
+            - generic [ref=e1260]: Humidity
+            - generic [ref=e1261]: No reading
+          - generic [ref=e1262]:
+            - generic [ref=e1263]: Smoke
+            - generic [ref=e1264]: No reading
+      - button "Sensor 12" [ref=e1265] [cursor=pointer]:
+        - generic [ref=e1270]:
+          - strong [ref=e1271]: Sensor 12
+          - generic [ref=e1272]:
+            - generic [ref=e1273]: Temp
+            - generic [ref=e1274]: No reading
+          - generic [ref=e1275]:
+            - generic [ref=e1276]: Humidity
+            - generic [ref=e1277]: No reading
+          - generic [ref=e1278]:
+            - generic [ref=e1279]: Smoke
+            - generic [ref=e1280]: No reading
+      - button "Sensor 13" [ref=e1281] [cursor=pointer]:
+        - generic [ref=e1286]:
+          - strong [ref=e1287]: Sensor 13
+          - generic [ref=e1288]:
+            - generic [ref=e1289]: Temp
+            - generic [ref=e1290]: No reading
+          - generic [ref=e1291]:
+            - generic [ref=e1292]: Humidity
+            - generic [ref=e1293]: No reading
+          - generic [ref=e1294]:
+            - generic [ref=e1295]: Smoke
+            - generic [ref=e1296]: No reading
+      - button "Sensor 14" [ref=e1297] [cursor=pointer]:
+        - generic [ref=e1302]:
+          - strong [ref=e1303]: Sensor 14
+          - generic [ref=e1304]:
+            - generic [ref=e1305]: Temp
+            - generic [ref=e1306]: No reading
+          - generic [ref=e1307]:
+            - generic [ref=e1308]: Humidity
+            - generic [ref=e1309]: No reading
+          - generic [ref=e1310]:
+            - generic [ref=e1311]: Smoke
+            - generic [ref=e1312]: No reading
+      - button "Sensor 15" [ref=e1313] [cursor=pointer]:
+        - generic [ref=e1318]:
+          - strong [ref=e1319]: Sensor 15
+          - generic [ref=e1320]:
+            - generic [ref=e1321]: Temp
+            - generic [ref=e1322]: No reading
+          - generic [ref=e1323]:
+            - generic [ref=e1324]: Humidity
+            - generic [ref=e1325]: No reading
+          - generic [ref=e1326]:
+            - generic [ref=e1327]: Smoke
+            - generic [ref=e1328]: No reading
+      - button "Sensor 16" [ref=e1329] [cursor=pointer]:
+        - generic [ref=e1334]:
+          - strong [ref=e1335]: Sensor 16
+          - generic [ref=e1336]:
+            - generic [ref=e1337]: Temp
+            - generic [ref=e1338]: No reading
+          - generic [ref=e1339]:
+            - generic [ref=e1340]: Humidity
+            - generic [ref=e1341]: No reading
+          - generic [ref=e1342]:
+            - generic [ref=e1343]: Smoke
+            - generic [ref=e1344]: No reading
+      - button "Sensor 17" [ref=e1345] [cursor=pointer]:
+        - generic [ref=e1350]:
+          - strong [ref=e1351]: Sensor 17
+          - generic [ref=e1352]:
+            - generic [ref=e1353]: Temp
+            - generic [ref=e1354]: No reading
+          - generic [ref=e1355]:
+            - generic [ref=e1356]: Humidity
+            - generic [ref=e1357]: No reading
+          - generic [ref=e1358]:
+            - generic [ref=e1359]: Smoke
+            - generic [ref=e1360]: No reading
+      - button "Sensor 18" [ref=e1361] [cursor=pointer]:
+        - generic [ref=e1366]:
+          - strong [ref=e1367]: Sensor 18
+          - generic [ref=e1368]:
+            - generic [ref=e1369]: Temp
+            - generic [ref=e1370]: No reading
+          - generic [ref=e1371]:
+            - generic [ref=e1372]: Humidity
+            - generic [ref=e1373]: No reading
+          - generic [ref=e1374]:
+            - generic [ref=e1375]: Smoke
+            - generic [ref=e1376]: No reading
+      - button "Sensor 19" [ref=e1377] [cursor=pointer]:
+        - generic [ref=e1382]:
+          - strong [ref=e1383]: Sensor 19
+          - generic [ref=e1384]:
+            - generic [ref=e1385]: Temp
+            - generic [ref=e1386]: No reading
+          - generic [ref=e1387]:
+            - generic [ref=e1388]: Humidity
+            - generic [ref=e1389]: No reading
+          - generic [ref=e1390]:
+            - generic [ref=e1391]: Smoke
+            - generic [ref=e1392]: No reading
+      - button "Sensor 20" [ref=e1393] [cursor=pointer]:
+        - generic [ref=e1398]:
+          - strong [ref=e1399]: Sensor 20
+          - generic [ref=e1400]:
+            - generic [ref=e1401]: Temp
+            - generic [ref=e1402]: No reading
+          - generic [ref=e1403]:
+            - generic [ref=e1404]: Humidity
+            - generic [ref=e1405]: No reading
+          - generic [ref=e1406]:
+            - generic [ref=e1407]: Smoke
+            - generic [ref=e1408]: No reading
+      - button "Sensor 21" [ref=e1409] [cursor=pointer]:
+        - generic [ref=e1414]:
+          - strong [ref=e1415]: Sensor 21
+          - generic [ref=e1416]:
+            - generic [ref=e1417]: Temp
+            - generic [ref=e1418]: No reading
+          - generic [ref=e1419]:
+            - generic [ref=e1420]: Humidity
+            - generic [ref=e1421]: No reading
+          - generic [ref=e1422]:
+            - generic [ref=e1423]: Smoke
+            - generic [ref=e1424]: No reading
+      - button "Sensor 22" [ref=e1425] [cursor=pointer]:
+        - generic [ref=e1430]:
+          - strong [ref=e1431]: Sensor 22
+          - generic [ref=e1432]:
+            - generic [ref=e1433]: Temp
+            - generic [ref=e1434]: No reading
+          - generic [ref=e1435]:
+            - generic [ref=e1436]: Humidity
+            - generic [ref=e1437]: No reading
+          - generic [ref=e1438]:
+            - generic [ref=e1439]: Smoke
+            - generic [ref=e1440]: No reading
+      - button "Sensor 23" [ref=e1441] [cursor=pointer]:
+        - generic [ref=e1446]:
+          - strong [ref=e1447]: Sensor 23
+          - generic [ref=e1448]:
+            - generic [ref=e1449]: Temp
+            - generic [ref=e1450]: No reading
+          - generic [ref=e1451]:
+            - generic [ref=e1452]: Humidity
+            - generic [ref=e1453]: No reading
+          - generic [ref=e1454]:
+            - generic [ref=e1455]: Smoke
+            - generic [ref=e1456]: No reading
+      - button "Sensor 24" [ref=e1457] [cursor=pointer]:
+        - generic [ref=e1462]:
+          - strong [ref=e1463]: Sensor 24
+          - generic [ref=e1464]:
+            - generic [ref=e1465]: Temp
+            - generic [ref=e1466]: No reading
+          - generic [ref=e1467]:
+            - generic [ref=e1468]: Humidity
+            - generic [ref=e1469]: No reading
+          - generic [ref=e1470]:
+            - generic [ref=e1471]: Smoke
+            - generic [ref=e1472]: No reading
+      - button "Sensor 25" [ref=e1473] [cursor=pointer]:
+        - generic [ref=e1478]:
+          - strong [ref=e1479]: Sensor 25
+          - generic [ref=e1480]:
+            - generic [ref=e1481]: Temp
+            - generic [ref=e1482]: No reading
+          - generic [ref=e1483]:
+            - generic [ref=e1484]: Humidity
+            - generic [ref=e1485]: No reading
+          - generic [ref=e1486]:
+            - generic [ref=e1487]: Smoke
+            - generic [ref=e1488]: No reading
+      - button "Sensor 26" [ref=e1489] [cursor=pointer]:
+        - generic [ref=e1494]:
+          - strong [ref=e1495]: Sensor 26
+          - generic [ref=e1496]:
+            - generic [ref=e1497]: Temp
+            - generic [ref=e1498]: No reading
+          - generic [ref=e1499]:
+            - generic [ref=e1500]: Humidity
+            - generic [ref=e1501]: No reading
+          - generic [ref=e1502]:
+            - generic [ref=e1503]: Smoke
+            - generic [ref=e1504]: No reading
+      - button "Sensor 27" [ref=e1505] [cursor=pointer]:
+        - generic [ref=e1510]:
+          - strong [ref=e1511]: Sensor 27
+          - generic [ref=e1512]:
+            - generic [ref=e1513]: Temp
+            - generic [ref=e1514]: No reading
+          - generic [ref=e1515]:
+            - generic [ref=e1516]: Humidity
+            - generic [ref=e1517]: No reading
+          - generic [ref=e1518]:
+            - generic [ref=e1519]: Smoke
+            - generic [ref=e1520]: No reading
+      - button "Sensor 28" [ref=e1521] [cursor=pointer]:
+        - generic [ref=e1526]:
+          - strong [ref=e1527]: Sensor 28
+          - generic [ref=e1528]:
+            - generic [ref=e1529]: Temp
+            - generic [ref=e1530]: No reading
+          - generic [ref=e1531]:
+            - generic [ref=e1532]: Humidity
+            - generic [ref=e1533]: No reading
+          - generic [ref=e1534]:
+            - generic [ref=e1535]: Smoke
+            - generic [ref=e1536]: No reading
+      - button "Sensor 29" [ref=e1537] [cursor=pointer]:
+        - generic [ref=e1542]:
+          - strong [ref=e1543]: Sensor 29
+          - generic [ref=e1544]:
+            - generic [ref=e1545]: Temp
+            - generic [ref=e1546]: No reading
+          - generic [ref=e1547]:
+            - generic [ref=e1548]: Humidity
+            - generic [ref=e1549]: No reading
+          - generic [ref=e1550]:
+            - generic [ref=e1551]: Smoke
+            - generic [ref=e1552]: No reading
+      - button "Sensor 30" [ref=e1553] [cursor=pointer]:
+        - generic [ref=e1558]:
+          - strong [ref=e1559]: Sensor 30
+          - generic [ref=e1560]:
+            - generic [ref=e1561]: Temp
+            - generic [ref=e1562]: No reading
+          - generic [ref=e1563]:
+            - generic [ref=e1564]: Humidity
+            - generic [ref=e1565]: No reading
+          - generic [ref=e1566]:
+            - generic [ref=e1567]: Smoke
+            - generic [ref=e1568]: No reading
+    - generic:
+      - generic [ref=e5]:
+        - button "Zoom in" [ref=e6] [cursor=pointer]
+        - button "Zoom out" [ref=e8] [cursor=pointer]
+      - generic: 500 m
+      - group [ref=e11]:
+        - generic "Toggle attribution" [ref=e12] [cursor=pointer]
+        - generic [ref=e13]: ESA WorldCover 2021 · CC BY 4.0 | Esri, HERE, Garmin, © OpenStreetMap contributors, GIS user community
+  - generic [ref=e14]:
+    - group "Map layers" [ref=e15]:
+      - button "Land cover" [pressed] [ref=e16] [cursor=pointer]
+      - button "Ecological zones" [ref=e17] [cursor=pointer]
+    - generic [ref=e18]:
+      - button "Use this area" [ref=e19] [cursor=pointer]
+      - generic [ref=e20]: New experiment at map centre
+    - group [ref=e21]:
+      - generic "Legend 25 m simulation grid inside outline" [ref=e22] [cursor=pointer]:
+        - text: Legend
+        - generic [ref=e23]: 25 m simulation grid inside outline
+      - generic [ref=e24]:
+        - generic [ref=e25]: Forest
+        - generic [ref=e27]: Shrubland
+        - generic [ref=e29]: Grassland
+        - generic [ref=e31]: Cropland
+        - generic [ref=e33]: Built-up
+        - generic [ref=e35]: Water
+        - generic [ref=e37]: Bare / sparse
+      - paragraph [ref=e39]: ESA WorldCover 2021 regional context; 10 m source. The outlined area always shows the effective land cover used by this run.
+  - generic:
+    - text: Flaming Residual heat Burned
+    - generic: Simulated
+  - generic [ref=e40]:
+    - generic [ref=e41]:
+      - strong [ref=e42]: Dryspell
+      - generic [ref=e43]: Test mode
+    - button "Experiment menu" [ref=e44] [cursor=pointer]
+  - region "Wind controls" [ref=e46]:
+    - generic [ref=e47]:
+      - strong [ref=e48]: Manual run wind
+      - generic [aria-hidden] [ref=e49]: ↑
+    - paragraph [ref=e50]: 7 °C · 4.0 m/s · from W to E
+    - group "Wind source" [ref=e51]:
+      - button "Use API wind" [ref=e52] [cursor=pointer]
+      - button "Manual wind" [pressed] [ref=e53] [cursor=pointer]
+    - generic [ref=e1083]:
+      - generic [ref=e1084]:
+        - text: Speed m/s
+        - spinbutton "Wind speed m/s" [ref=e1085]: "4"
+      - generic [ref=e1086]:
+        - text: From degrees
+        - spinbutton "Wind from degrees" [ref=e1087]: "270"
+      - button "Apply wind" [ref=e1088] [cursor=pointer]
+    - button "Use saved demo weather" [ref=e54] [cursor=pointer]
+  - status [ref=e55]: Duration changed. Run the experiment again.
+  - generic:
+    - toolbar "Object tools" [ref=e57]:
+      - button "Select" [pressed] [ref=e58] [cursor=pointer]
+      - button "Combined" [ref=e62] [cursor=pointer]
+      - button "Temperature" [ref=e68] [cursor=pointer]
+      - button "Humidity" [ref=e72] [cursor=pointer]
+      - button "Smoke" [ref=e77] [cursor=pointer]
+      - button "Fire" [ref=e81] [cursor=pointer]
+    - generic [ref=e85]:
+      - generic [ref=e1569]:
+        - generic [ref=e1570]:
+          - text: Duration in hours
+          - spinbutton "Duration in hours" [ref=e1571]: "12.5"
+        - button "Apply duration" [ref=e1572] [cursor=pointer]
+      - generic [ref=e90]: Simulation time
+    - generic [ref=e91]:
+      - button "Run" [disabled] [ref=e92]
+      - button "Rewind to start" [disabled] [ref=e96]
+      - status "Simulation time" [ref=e100]: 0:00
+      - slider "Simulation timeline" [disabled] [ref=e101] [cursor=pointer]: "0"
+      - generic [ref=e102]: 12.5 h
+      - group [ref=e103]:
+        - generic "10×" [ref=e104] [cursor=pointer]
+      - button "Undo last edit" [ref=e107] [cursor=pointer]
+      - button "Object list" [ref=e111] [cursor=pointer]

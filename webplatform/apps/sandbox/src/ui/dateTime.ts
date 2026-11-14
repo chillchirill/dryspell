@@ -1,0 +1,7 @@
+import type {SandboxDocument,SandboxWeatherCatalog} from '@dryspell/contracts/sandbox';
+export const utcLabel=(value:string)=>new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value))+' UTC';
+export function weatherOrigin(document:SandboxDocument,now=Date.now()):string{return document.weatherSelection?.mode==='historical'?document.scenario.startTime:new Date(now).toISOString();}
+export function canReuseCurrentWeather(document:SandboxDocument,now=Date.now()):boolean {const age=now-Date.parse(document.environment.weather.issuedAt);return age>=0&&age<300000&&Math.abs(now-Date.parse(document.scenario.startTime))<300000;}
+export function historicalRange(catalog:SandboxWeatherCatalog){return {min:Date.parse(catalog.availableFrom),max:Date.parse(catalog.latestHistoricalStart),step:catalog.stepSec*1000};}
+export function clampHistorical(value:number,catalog:SandboxWeatherCatalog):string {const r=historicalRange(catalog);if(!Number.isFinite(value)||!Number.isFinite(r.min)||r.max<r.min)throw new Error('Choose a valid historical time.');return new Date(Math.max(r.min,Math.min(r.max,r.min+Math.round((value-r.min)/r.step)*r.step))).toISOString();}
+export function historicalDayRange(value:string,catalog:SandboxWeatherCatalog){const full=historicalRange(catalog),day=Date.parse(value.slice(0,10)+'T00:00:00.000Z');return {min:Math.max(full.min,day),max:Math.min(full.max,day+86400000-full.step),step:full.step};}

@@ -4,6 +4,13 @@ import {fixture} from './test-fixture';
 
 const directions=[{from:0,dx:0,dy:-1},{from:45,dx:-1,dy:-1},{from:90,dx:-1,dy:0},{from:135,dx:-1,dy:1},{from:180,dx:0,dy:1},{from:225,dx:1,dy:1},{from:270,dx:1,dy:0},{from:315,dx:1,dy:-1}];
 describe('meteorological wind and geographic propagation',()=>{
+  it('retains configured direction throughout calm manual weather and replay sampling',()=>{
+    const {e}=fixture(5);
+    for(const from of [0,45,90,135,180,225,270,315]){
+      e.weather.samples=[0,3600].map(timeSec=>({...e.weather.samples[0],timeSec,windFromDeg:from,windSpeedMps:0}));
+      for(const t of [0,5,180,1800,3600]){expect(weatherAt(e.weather,t).windSpeedMps).toBe(0);expect(weatherAt(e.weather,t).windFromDeg).toBe(from);}
+    }
+  });
   for(const {from,dx,dy} of directions)it(`spreads downwind from ${from} degrees on north-increasing rows`,()=>{
     const {s,e}=fixture(21),g=e.landscape,c=220,down=c+4*dx+4*dy*g.width,up=c-4*dx-4*dy*g.width;
     const vector=windVector(5,from);expect(vector.east).toBeCloseTo(dx*5/(dx&&dy?Math.SQRT2:1));expect(vector.north).toBeCloseTo(dy*5/(dx&&dy?Math.SQRT2:1));

@@ -1,0 +1,56 @@
+- main [ref=f2e1]:
+  - link "Skip to object tools" [ref=f2e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Terrain map" [ref=f2e3]:
+    - generic:
+      - region "Map" [ref=f2e4]
+      - 'button "Sensor 01: 16.7°C hum:71.9% sm:0%. Smoke is a relative index, not gas concentration." [ref=f2e121] [cursor=pointer]':
+        - 'generic "Sensor 01. Temperature in Celsius; hum: relative humidity; sm: relative smoke index 0–100%, not a gas concentration. n/a: channel not measured; —: missing; off: disabled. normal sensor state." [ref=f2e110]': 16.7°C hum:71.9% sm:0%
+      - button "Ignition" [ref=f2e111] [cursor=pointer]
+    - generic:
+      - generic [ref=f2e5]:
+        - button "Zoom in" [ref=f2e6] [cursor=pointer]
+        - button "Zoom out" [ref=f2e8] [cursor=pointer]
+      - generic: 500 m
+      - group [ref=f2e11]:
+        - generic "Toggle attribution" [ref=f2e12] [cursor=pointer]
+        - generic [ref=f2e13]: ESA WorldCover 2021 · CC BY 4.0 | Esri, HERE, Garmin, © OpenStreetMap contributors, GIS user community
+  - group [ref=f2e14]:
+    - generic "Layers" [ref=f2e15] [cursor=pointer]
+  - generic:
+    - text: Flaming Residual heat Burned
+    - generic: Simulated
+  - generic [ref=f2e16]:
+    - generic [ref=f2e17]:
+      - strong [ref=f2e18]: Dryspell
+      - generic [ref=f2e19]: Test mode
+    - button "Experiment menu" [ref=f2e20] [cursor=pointer]
+  - button "Weather settings" [ref=f2e22] [cursor=pointer]:
+    - generic [aria-hidden] [ref=f2e23]: ↑
+    - generic [ref=f2e24]: 17°C · 4.5 m/s · Past
+  - status [ref=f2e25]: Simulation running. Select a sensor to inspect its readings.
+  - generic:
+    - toolbar "Object tools" [ref=f2e27]:
+      - button "Select" [pressed] [ref=f2e28] [cursor=pointer]
+      - button "Add sensor" [ref=f2e32] [cursor=pointer]
+      - button "Fire" [ref=f2e38] [cursor=pointer]
+    - generic [ref=f2e42]:
+      - button "Pause" [active] [ref=f2e122] [cursor=pointer]
+      - button "Rewind to start" [ref=f2e47] [cursor=pointer]
+      - status "Simulation time" [ref=f2e51]: 2:30
+      - slider "Simulation timeline" [ref=f2e52] [cursor=pointer]: "150"
+      - generic "Experiment duration in hours. Enter or leave the field to apply." [ref=f2e75]:
+        - spinbutton "Duration in hours" [ref=f2e76]: "6"
+        - text: h
+      - button "Choose start date" [ref=f2e55] [cursor=pointer]:
+        - generic [ref=f2e58]: 07-01
+      - group [ref=f2e59]:
+        - generic "300×" [ref=f2e120] [cursor=pointer]
+        - generic [ref=f2e114]:
+          - button "1×" [ref=f2e115] [cursor=pointer]
+          - button "10×" [ref=f2e116] [cursor=pointer]
+          - button "60×" [ref=f2e117] [cursor=pointer]
+          - button "150×" [ref=f2e118] [cursor=pointer]
+          - button "300×" [pressed] [ref=f2e119] [cursor=pointer]
+      - button "Undo last edit" [ref=f2e63] [cursor=pointer]
+      - button "Object list" [ref=f2e67] [cursor=pointer]

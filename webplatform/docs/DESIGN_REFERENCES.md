@@ -25,3 +25,8 @@ Read the official [MapLibre v5-to-v6 migration guide](https://maplibre.org/mapli
 
 ## Sandbox visual revision
 User supplied a charcoal geographic UI reference on2026-11-14. Applied graphite panels, dark geographical base, warm fire and violet wind with the simplified simulator composition. Official Esri World Dark Gray Base service metadata was fetched at https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer?f=pjson and provider copyright retained. Actual browser review rejected CARTO dark tiles because they rendered API-key-required watermarks; those tiles were replaced, not counted as working delivery. This style change does not modify numerical terrain or weather.
+
+
+## Compact sandbox-v4 instruction review — 14 November 2026
+
+Re-read the complete official Anthropic frontend-design source at https://raw.githubusercontent.com/anthropics/skills/main/skills/frontend-design/SKILL.md and the full Vercel implementation guideline at https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md. Applied subject-specific composition, removal of duplicate visible controls, readable semantic states, keyboard/date forms, constrained overlays and source review. SHA-256 revisions reviewed earlier on the same date: Anthropic `d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3`; Vercel `d246b026f4f29b5823a9cc857f9edf3d2507002e055e32040cadeaf3b38e0234`. The full sources were read, not installed or executed as native skill tooling. Existing focused Distill guidance remains the simplification reference; no additional researched skill was activated. The user's compact interaction requirements supersede older 30-sensor and permanent-duration studies.

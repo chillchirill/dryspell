@@ -3,9 +3,10 @@ import {createSimulationSession,simulateFrame,computeArrivalTimes,MAX_SENSOR_CHE
 import {fixture} from './test-fixture';
 
 describe('bounded long-duration engine',()=>{
-  it('preserves previously measured six-hour frame checksums',()=>{
+  it('pins the new versioned combustion model six-hour frame checksums',()=>{
     const {s,e}=fixture();s.config.durationSec=21600;e.weather.samples.push({...e.weather.samples[0],timeSec:21600,windSpeedMps:4,windFromDeg:270});
-    const expected=['8406149240eb03328af11101777ea24cb499f5f72c05ee06082ba025f1a73d86','036a9330b289b44ace327c1df5bec761796c619ed4f3a1b4bdd3e209d223e7f5','1839b7df9e4d693e1406f20e6748f402dc7c5072b61c2b280b7981cf66effd44','6162fde219460baf9fa90841e8c14ce27db262dbd09dff8b880af85b2fdf264e'];
+    // 1.2.0 results were deliberately superseded by the fuel-consumption/observation model.
+    const expected=['9020761de1ec980296ad30bdf60698bfd73050745073866cbd99261df09211af','ffeb2515f1359df5b5c34d5d26ad85066c4aa7f4d6d355521e439c361c31a9b1','3e38c4a10655f0082a4b43071d07c34dc97a529c286c27f3238483ab529ff051','7581a381448c99b7ed1c2c9c9c424d97ae244585fa9d131402e1a27eead746e2'];
     expect([0,30,300,21600].map(t=>simulateFrame(s,e,t).checksum)).toEqual(expected);
   });
   it('handles huge constant tails without allocating horizon-sized rate arrays',()=>{

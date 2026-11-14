@@ -1,0 +1,63 @@
+- main [ref=f2e1]:
+  - link "Skip to object tools" [ref=f2e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Terrain map" [ref=f2e3]:
+    - region "Map" [ref=f2e4]
+    - generic:
+      - generic [ref=f2e5]:
+        - button "Zoom in" [ref=f2e6] [cursor=pointer]
+        - button "Zoom out" [ref=f2e8] [cursor=pointer]
+      - generic: 500 m
+  - generic [ref=f2e11]:
+    - group "Map layers" [ref=f2e12]:
+      - button "Land cover" [pressed] [ref=f2e13] [cursor=pointer]
+      - button "Ecological zones" [ref=f2e14] [cursor=pointer]
+    - generic [ref=f2e15]:
+      - button "Use this area" [ref=f2e16] [cursor=pointer]
+      - generic [ref=f2e17]: New experiment at map centre
+    - button "Sensor list" [ref=f2e18] [cursor=pointer]
+    - group [ref=f2e19]:
+      - generic "Legend 25 m simulation grid inside outline" [ref=f2e20] [cursor=pointer]:
+        - text: Legend
+        - generic [ref=f2e21]: 25 m simulation grid inside outline
+  - generic:
+    - text: Flaming Residual heat Burned
+    - generic: Simulated
+  - generic [ref=f2e22]:
+    - generic [ref=f2e23]:
+      - strong [ref=f2e24]: Dryspell
+      - generic [ref=f2e25]: Test mode
+    - button "Experiment menu" [ref=f2e26] [cursor=pointer]
+  - region "Wind controls" [ref=f2e28]:
+    - generic [ref=f2e29]:
+      - strong [ref=f2e30]: API run weather
+      - generic [aria-hidden] [ref=f2e31]: ↑
+    - paragraph [ref=f2e32]: Getting weather…
+    - group "Wind source" [ref=f2e33]:
+      - button "Use API wind" [disabled] [pressed] [ref=f2e34]
+      - button "Manual wind" [disabled] [ref=f2e35]
+    - button "Use saved demo weather" [disabled] [ref=f2e36]
+  - status [ref=f2e37]: Preparing the landscape…
+  - generic:
+    - toolbar "Object tools" [ref=f2e39]:
+      - button "Select" [pressed] [ref=f2e40] [cursor=pointer]
+      - button "Combined" [disabled] [ref=f2e44]
+      - button "Temperature" [disabled] [ref=f2e50]
+      - button "Humidity" [disabled] [ref=f2e54]
+      - button "Smoke" [disabled] [ref=f2e59]
+      - button "Fire" [disabled] [ref=f2e63]
+    - generic [ref=f2e68]:
+      - generic [ref=f2e69]:
+        - text: Duration in hours
+        - spinbutton "Duration in hours" [ref=f2e70]: "6"
+      - button "Updating weather…" [disabled] [ref=f2e71]
+    - generic [ref=f2e72]:
+      - button "Run" [disabled] [ref=f2e73]
+      - button "Rewind to start" [disabled] [ref=f2e77]
+      - status "Simulation time" [ref=f2e81]: 0:00
+      - slider "Simulation timeline" [disabled] [ref=f2e82] [cursor=pointer]: "0"
+      - generic [ref=f2e83]: 6 h
+      - group [ref=f2e84]:
+        - generic "10×" [ref=f2e85] [cursor=pointer]
+      - button "Undo last edit" [disabled] [ref=f2e88]
+      - button "Object list" [ref=f2e92] [cursor=pointer]

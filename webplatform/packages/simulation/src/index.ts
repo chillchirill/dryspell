@@ -2,8 +2,12 @@ import { sha256Hex,sha256Uint32LE } from './hash';
 import { SENSOR_PROFILES, type Coordinate, type EnvironmentSnapshot, type LandscapeSnapshot, type Scenario, type SimulationFrame, type SimulationCheckpoint, type WeatherSample, type WeatherSnapshot, type ValidatedObservation, type Channel } from '@dryspell/contracts';
 
 import { PUBLISHED_FUELS, equivalentDeadSpreadMps } from './fuels';
+import {combustionAt,combustionProfile,isSurfaceFuel,FUEL_PARAMETER_VERSION,type CombustionProfile} from './combustion';
+import {observationGeometry,queriedSourceFieldAt,sourceObservationTargets,type QueriedSourceField} from './observation';
 export { PUBLISHED_FUELS, equivalentDeadSpreadMps } from './fuels';
-export const ENGINE_VERSION = 'surface-grid-1.2.0';
+export * from './combustion';
+export * from './observation';
+export const ENGINE_VERSION = 'surface-grid-1.3.0';
 const RAD = Math.PI / 180;
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 export const checksum = (x: unknown) => sha256Hex(JSON.stringify(x));
@@ -18,8 +22,11 @@ export function weatherAt(snapshot: WeatherSnapshot, t: number): WeatherSample {
   const a = samples[hi - 1], b = samples[hi], q = (t - a.timeSec) / (b.timeSec - a.timeSec);
   const lerp = (x: number, y: number) => x + q * (y - x);
   const va = windVector(a.windSpeedMps, a.windFromDeg), vb = windVector(b.windSpeedMps, b.windFromDeg);
-  const east = lerp(va.east, vb.east), north = lerp(va.north, vb.north);
-  return { timeSec: t, temperatureC: lerp(a.temperatureC,b.temperatureC), humidityPct: lerp(a.humidityPct,b.humidityPct), precipitationMm: lerp(a.precipitationMm,b.precipitationMm), windSpeedMps: Math.hypot(east,north), windFromDeg: (Math.atan2(-east,-north)/RAD + 360)%360 };
+  const east = lerp(va.east, vb.east), north = lerp(va.north, vb.north), speed = Math.hypot(east,north);
+  // atan2 of signed zero has an arbitrary direction. Preserve the declared
+  // bearing at calm so a manual zero-speed wind remains stable on replay.
+  const from = speed < 1e-12 ? (a.windFromDeg + q * (((b.windFromDeg-a.windFromDeg+540)%360)-180)+360)%360 : (Math.atan2(-east,-north)/RAD+360)%360;
+  return { timeSec: t, temperatureC: lerp(a.temperatureC,b.temperatureC), humidityPct: lerp(a.humidityPct,b.humidityPct), precipitationMm: lerp(a.precipitationMm,b.precipitationMm), windSpeedMps: speed, windFromDeg: from };
 }
 function wrappedSpan(west: number, east: number) { return (east - west + 360) % 360 || 360; }
 export function cellIndexAt(grid: LandscapeSnapshot, location: Coordinate): number {
@@ -44,7 +51,7 @@ class Heap {
 /** Empirical, dimensionally explicit baseline, not a full Rothermel implementation. */
 export function edgeRate(grid: LandscapeSnapshot, from: number, to: number, weather: WeatherSample): number {
   const a=grid.cells[from],b=grid.cells[to];
-  if(!a?.burnable||!b?.burnable||a.cover==='unknown'||b.cover==='unknown')return 0;
+  if(!isSurfaceFuel(a)||!isSurfaceFuel(b))return 0;
   const dx=(to%grid.width)-(from%grid.width),dy=Math.floor(to/grid.width)-Math.floor(from/grid.width),len=Math.hypot(dx,dy);
   const vector=windVector(weather.windSpeedMps,weather.windFromDeg);
   // Explicit canopy adjustment from 10 m wind to an illustrative mid-flame wind.
@@ -127,60 +134,46 @@ export function computeArrivalTimes(grid: LandscapeSnapshot, weather: WeatherSna
   if(!Number.isFinite(integrationStepSec)||integrationStepSec<=0)throw new Error('Invalid numerical step');
   const solve=weather.samples.length>1&&!referenceIntegration?createTravelSolver(grid,weather,horizon,integrationStepSec):(from:number,to:number,start:number)=>travelTime(grid,weather,from,to,start,horizon,integrationStepSec);
   const arrival=new Float64Array(grid.cells.length).fill(Infinity),heap=new Heap();
-  for(const ignition of ignitions){ const i=cellIndexAt(grid,ignition.location); if(i<0)throw new Error('Ignition outside prepared area');if(!grid.cells[i].burnable||grid.cells[i].cover==='unknown')throw new Error('Ignition requires known burnable terrain');if(ignition.timeSec<arrival[i]){arrival[i]=ignition.timeSec;heap.push([ignition.timeSec,i]);}}
+  for(const ignition of ignitions){ const i=cellIndexAt(grid,ignition.location); if(i<0)throw new Error('Ignition outside prepared area');if(!isSurfaceFuel(grid.cells[i]))throw new Error('Ignition requires known burnable terrain');if(ignition.timeSec<arrival[i]){arrival[i]=ignition.timeSec;heap.push([ignition.timeSec,i]);}}
   while(heap.a.length){const [time,i]=heap.pop();if(time!==arrival[i]||time>horizon)continue;const x=i%grid.width,y=Math.floor(i/grid.width);
     for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){if((!dx&&!dy)||Math.max(Math.abs(dx),Math.abs(dy))===2&&Math.abs(dx)+Math.abs(dy)!==3)continue;const xx=x+dx,yy=y+dy;if(xx<0||xx>=grid.width||yy<0||yy>=grid.height)continue;const j=yy*grid.width+xx;
-      if(!grid.cells[j].burnable||grid.cells[j].cover==='unknown')continue;
-      if(Math.abs(dx)===1&&Math.abs(dy)===1&&(!grid.cells[y*grid.width+xx].burnable||!grid.cells[yy*grid.width+x].burnable||grid.cells[y*grid.width+xx].cover==='unknown'||grid.cells[yy*grid.width+x].cover==='unknown'))continue;
-      if(Math.abs(dx)+Math.abs(dy)===3){const sx=Math.sign(dx),sy=Math.sign(dy),middle=Math.abs(dx)===2?[y*grid.width+x+sx,(y+sy)*grid.width+x+sx]:[(y+sy)*grid.width+x,(y+sy)*grid.width+x+sx];if(middle.some(k=>!grid.cells[k].burnable||grid.cells[k].cover==='unknown'))continue;}
+      if(!isSurfaceFuel(grid.cells[j]))continue;
+      if(Math.abs(dx)===1&&Math.abs(dy)===1&&(!isSurfaceFuel(grid.cells[y*grid.width+xx])||!isSurfaceFuel(grid.cells[yy*grid.width+x])))continue;
+      if(Math.abs(dx)+Math.abs(dy)===3){const sx=Math.sign(dx),sy=Math.sign(dy),middle=Math.abs(dx)===2?[y*grid.width+x+sx,(y+sy)*grid.width+x+sx]:[(y+sy)*grid.width+x,(y+sy)*grid.width+x+sx];if(middle.some(k=>!isSurfaceFuel(grid.cells[k])))continue;}
       if(arrival[j]<=time)continue; const next=solve(i,j,time);if(next<arrival[j]){arrival[j]=next;heap.push([next,j]);}
     }
   }return arrival;
 }
 function random(seed:number,id:string,t:number,channel:string){return sha256Uint32LE(`${seed}:${id}:${t}:${channel}`)/4294967296*2-1;}
-interface SensorState { temperatureC:number; humidityPct:number; smokePct:number; noise:Record<Channel,number>; }
+interface SensorState { temperatureC:number; humidityPct:number; smokePct:number; temperatureLimited?:boolean; noise:Record<Channel,number>; }
 interface EngineState { timeSec:number; sensors:Record<string,SensorState>; }
-interface Cache { arrival:Float64Array; checkpoints:Map<number,EngineState>; last:EngineState; }
-export const MAX_SENSOR_CHECKPOINTS=512;
+interface Cache { arrival:Float64Array; checkpoints:Map<number,EngineState>;checkpointTimes:number[]; last:EngineState; profiles:(CombustionProfile|null)[];geometry:ReturnType<typeof observationGeometry>;field?:QueriedSourceField;maxCheckpoints:number; }
+export const MAX_SENSOR_CHECKPOINTS=15360;
+function checkpointPosition(times:number[],target:number){let lo=0,hi=times.length;while(lo<hi){const mid=(lo+hi)>>>1;if(times[mid]<target)lo=mid+1;else hi=mid;}return lo;}
 function saveSensorCheckpoint(cache:Cache,state:EngineState){
+  if(!cache.checkpoints.has(state.timeSec))cache.checkpointTimes.splice(checkpointPosition(cache.checkpointTimes,state.timeSec),0,state.timeSec);
   cache.checkpoints.set(state.timeSec,structuredClone(state));
-  if(cache.checkpoints.size>MAX_SENSOR_CHECKPOINTS){for(const time of cache.checkpoints.keys()){if(time!==0){cache.checkpoints.delete(time);break;}}}
+  if(cache.checkpoints.size>cache.maxCheckpoints){for(const time of cache.checkpoints.keys()){if(time!==0){cache.checkpoints.delete(time);cache.checkpointTimes.splice(checkpointPosition(cache.checkpointTimes,time),1);break;}}}
 }
 function nearestState(cache:Cache,target:number):EngineState {
-  let state=cache.last.timeSec<=target?cache.last:cache.checkpoints.get(0)!;
-  for(const [time,checkpoint] of cache.checkpoints){if(time<=target&&time>state.timeSec)state=checkpoint;}
-  return state;
+  const position=checkpointPosition(cache.checkpointTimes,target),time=cache.checkpointTimes[position]===target?target:cache.checkpointTimes[Math.max(0,position-1)];
+  return cache.last.timeSec<=target&&cache.last.timeSec>=time?cache.last:cache.checkpoints.get(time)!;
 }
 const caches=new Map<string,Cache>();
-function keyFor(s:Scenario,e:EnvironmentSnapshot){return checksum({engine:ENGINE_VERSION,id:s.id,revision:s.revision,seed:s.seed,start:s.startTime,config:s.config,sensors:s.sensors,ignitions:s.ignitions,environment:e});}
+function keyFor(s:Scenario,e:EnvironmentSnapshot){return checksum({engine:ENGINE_VERSION,parameters:FUEL_PARAMETER_VERSION,id:s.id,revision:s.revision,seed:s.seed,start:s.startTime,config:s.config,sensors:s.sensors,ignitions:s.ignitions,environment:e});}
 function initialState(s:Scenario,e:EnvironmentSnapshot):EngineState {const w=weatherAt(e.weather,0);return {timeSec:0,sensors:Object.fromEntries(s.sensors.map(sensor=>[sensor.id,{temperatureC:w.temperatureC,humidityPct:w.humidityPct,smokePct:0,noise:{temperatureC:0,humidityPct:0,smokePct:0}}]))};}
 function prepareCache(s:Scenario,e:EnvironmentSnapshot):Cache {
   if(s.environmentId!==e.id)throw new Error('Scenario/environment snapshot mismatch');
   if(e.status!=='ready'&&e.status!=='partial')throw new Error('Environment is not prepared');
-  const cache={arrival:computeArrivalTimes(e.landscape,e.weather,s.ignitions,s.config.durationSec,5,s.config.burnDurationSec),checkpoints:new Map<number,EngineState>(),last:initialState(s,e)};
+  const cache:Cache={arrival:computeArrivalTimes(e.landscape,e.weather,s.ignitions,s.config.durationSec,5,s.config.burnDurationSec),checkpoints:new Map<number,EngineState>(),checkpointTimes:[0],last:initialState(s,e),profiles:e.landscape.cells.map(combustionProfile),geometry:observationGeometry(e.landscape),maxCheckpoints:Math.max(2,Math.floor(MAX_SENSOR_CHECKPOINTS/Math.max(1,s.sensors.length)))};
   cache.checkpoints.set(0,structuredClone(cache.last));return cache;
 }
 function getCache(s:Scenario,e:EnvironmentSnapshot){if(s.environmentId!==e.id)throw new Error('Scenario/environment snapshot mismatch');const key=keyFor(s,e);let cache=caches.get(key);if(!cache){cache=prepareCache(s,e);caches.set(key,cache);if(caches.size>4)caches.delete(caches.keys().next().value!);}return cache;}
 export function clearSimulationCache(){caches.clear();}
-function responseTargets(s:Scenario,e:EnvironmentSnapshot,arrival:Float64Array,location:Coordinate,t:number,candidates:number[]) {
-  const w=weatherAt(e.weather,t),grid=e.landscape,v=windVector(w.windSpeedMps,w.windFromDeg),speed=Math.hypot(v.east,v.north);
-  let nearest=Infinity,smoke=0;
-  for(const i of candidates){const age=t-arrival[i];const c=cellCenter(grid,i);const dx=(((location.longitude-c.longitude+540)%360)-180)*RAD*6371008.8*Math.cos(location.latitude*RAD),dy=(location.latitude-c.latitude)*RAD*6371008.8;
-    const distance=Math.hypot(dx,dy);if(age<=s.config.burnDurationSec)nearest=Math.min(nearest,Math.max(0,distance-grid.cellSizeM*.5));
-    // Bounded wind-advected Gaussian puff approximation with diffusion and finite transport delay.
-    if(speed>.1){const along=(dx*v.east+dy*v.north)/speed,cross=Math.abs(dx*v.north-dy*v.east)/speed;const transport=along/speed;
-      if(along>0&&age>=transport&&age-transport<=s.config.burnDurationSec){const sigma=12+Math.sqrt(Math.max(0,transport))*3;smoke+=12*Math.exp(-cross*cross/(2*sigma*sigma))*Math.exp(-transport/180);}}
-  }
-  const q=Math.max(0,1-nearest/s.config.responseRadiusM)**2;
-  const temperature=w.temperatureC+s.config.temperatureGainC*q;
-  // Constant vapour pressure approximation using saturation vapour pressure ratio.
-  const saturation=(temp:number)=>Math.exp(17.625*temp/(243.04+temp));
-  return {temperatureC:temperature,humidityPct:clamp(w.humidityPct*saturation(w.temperatureC)/saturation(temperature),0,100),smokePct:clamp(smoke+75*q,0,100)};
-}
 function advance(s:Scenario,e:EnvironmentSnapshot,cache:Cache,target:number):EngineState {
   const state=structuredClone(nearestState(cache,target));
   const dt=5; // fixed response integration clock; output/render speed never modifies it
-  for(let time=state.timeSec+dt;time<=target;time+=dt){const candidates:number[]=[];cache.arrival.forEach((a,i)=>{if(a<=time&&time-a<=s.config.burnDurationSec+180)candidates.push(i);});for(const sensor of s.sensors){if(!sensor.enabled||sensor.archived)continue;const st=state.sensors[sensor.id];const profile=SENSOR_PROFILES[sensor.profileId],targets=responseTargets(s,e,cache.arrival,sensor.location,time,candidates);const alpha=1-Math.exp(-dt/profile.responseTimeSec);
+  for(let time=state.timeSec+dt;time<=target;time+=dt){const weather=weatherAt(e.weather,time),vector=windVector(weather.windSpeedMps,weather.windFromDeg);cache.field=queriedSourceFieldAt(cache.profiles,cache.arrival,time);for(const sensor of s.sensors){if(!sensor.enabled||sensor.archived)continue;const st=state.sensors[sensor.id];const profile=SENSOR_PROFILES[sensor.profileId],targets=sourceObservationTargets(e.landscape,cache.geometry,cache.profiles,cache.arrival,cache.field,sensor.location,weather,vector);const alpha=1-Math.exp(-dt/profile.responseTimeSec);st.temperatureLimited=targets.temperatureLimited;
       for(const channel of ['temperatureC','humidityPct','smokePct'] as const){st.noise[channel]=.82*st.noise[channel]+.18*random(s.seed,sensor.id,time,channel)*(profile.noise[channel]??0);st[channel]+=alpha*(targets[channel]-st[channel]);}}
     state.timeSec=time;if(time%s.config.checkpointIntervalSec===0)saveSensorCheckpoint(cache,state);}
   cache.last=structuredClone(state);return state;
@@ -196,14 +189,13 @@ export function deliverySampleTimes(sensor:Scenario['sensors'][number],deliveryT
     return sampleTime+Math.ceil(delay/5)*5===deliveryTimeSec;
   }).sort((a,b)=>b-a);
 }
-function frameFromState(s:Scenario,e:EnvironmentSnapshot,cache:Cache,state:EngineState,observedStates?:Map<number,EngineState>):SimulationFrame {
-  const timeSec=state.timeSec,timestamp=new Date(Date.parse(s.startTime)+timeSec*1000).toISOString(),burningCells:number[]=[],burnedCells:number[]=[];
-  cache.arrival.forEach((a,i)=>{if(a<=timeSec)(timeSec-a<=s.config.burnDurationSec?burningCells:burnedCells).push(i);});
+function readingsFromState(s:Scenario,e:EnvironmentSnapshot,cache:Cache,state:EngineState,observedStates?:Map<number,EngineState>):ValidatedObservation[] {
+  const timeSec=state.timeSec,timestamp=new Date(Date.parse(s.startTime)+timeSec*1000).toISOString();
   const readings:ValidatedObservation[]=s.sensors.filter(x=>x.enabled&&!x.archived).flatMap(sensor=>deliverySampleTimes(sensor,timeSec).map(observedSec=>{
     const active=(sensor.simulationFaults??[]).filter(f=>observedSec>=f.startTimeSec&&observedSec<f.endTimeSec);
     const delay=timeSec-observedSec;
     const observedState=delay?(observedStates?.get(observedSec)??advance(s,e,cache,observedSec)):state;
-    const st=observedState.sensors[sensor.id],values:Partial<Record<Channel,number>>={};const quality:ValidatedObservation['quality']=delay?['late']:[];
+    const st=observedState.sensors[sensor.id],values:Partial<Record<Channel,number>>={};const quality:ValidatedObservation['quality']=delay?['late']:[];if(st.temperatureLimited&&sensor.capabilities.some(channel=>channel==='temperatureC'||channel==='humidityPct'))quality.push('saturated');
     for(const ch of sensor.capabilities){
       const channelFaults=active.filter(f=>!f.channels||f.channels.includes(ch));
       if(channelFaults.some(f=>f.type==='dropout')){quality.push('missing');continue;}
@@ -216,7 +208,17 @@ function frameFromState(s:Scenario,e:EnvironmentSnapshot,cache:Cache,state:Engin
     return {id:`${s.id}:${s.revision}:${sensor.id}:${observedSec}`,sensorId:sensor.id,source:'simulated',scenarioId:s.id,revision:s.revision,recordedAt,receivedAt:timestamp,simulationTimeSec:observedSec,location:sensor.location,locationVersion:sensor.locationVersion??1,values,quality:[...new Set(quality)]};}));
   // Historical reads made for delayed devices must not move the authoritative integrator state.
   cache.last=structuredClone(state);
-  const frame={scenarioId:s.id,revision:s.revision,environmentId:e.id,timeSec,timestamp,engineVersion:ENGINE_VERSION,burningCells,burnedCells,readings,weather:weatherAt(e.weather,timeSec),checksum:''};frame.checksum=checksum(frame);return frame;
+  return readings;
+}
+function frameFromState(s:Scenario,e:EnvironmentSnapshot,cache:Cache,state:EngineState,observedStates?:Map<number,EngineState>):SimulationFrame {
+  return renderReadingFrame(s,e,cache,{timeSec:state.timeSec,readings:readingsFromState(s,e,cache,state,observedStates)});
+}
+function renderReadingFrame(s:Scenario,e:EnvironmentSnapshot,cache:Cache,tick:ObservationTick):SimulationFrame {
+  const timeSec=tick.timeSec,timestamp=new Date(Date.parse(s.startTime)+timeSec*1000).toISOString(),burningCells:number[]=[],burnedCells:number[]=[];
+  const combustion:NonNullable<SimulationFrame['combustion']>=[];
+  cache.arrival.forEach((a,i)=>{const profile=cache.profiles[i];if(a>timeSec||!profile)return;const source=combustionAt(profile,timeSec-a);(source.phase==='flaming'?burningCells:burnedCells).push(i);if(source.phase==='flaming'||source.phase==='residual')combustion.push({cell:i,...source,phase:source.phase});});
+  const readings=tick.readings;
+  const frame={scenarioId:s.id,revision:s.revision,environmentId:e.id,timeSec,timestamp,engineVersion:ENGINE_VERSION,burningCells,burnedCells,combustion,readings,weather:weatherAt(e.weather,timeSec),checksum:''};frame.checksum=checksum(frame);return frame;
 }
 export function simulateFrame(scenario:Scenario,environment:EnvironmentSnapshot,requestedTimeSec:number):SimulationFrame {
   if(!Number.isFinite(requestedTimeSec)||requestedTimeSec<0)throw new Error('Invalid simulation time');
@@ -229,8 +231,13 @@ export interface SimulationSession {
   frameAt(timeSec:number):SimulationFrame;
   /** Integrates at most maxSteps fixed ticks; undefined means call again after yielding. */
   prepareFrame(timeSec:number,maxSteps?:number):SimulationFrame|undefined;
+  /** Same integration/deliveries, without constructing or hashing an undisplayed terrain frame. */
+  prepareReadings(timeSec:number,maxSteps?:number):ObservationTick|undefined;
+  /** Materializes an internally generated observation tick without reintegrating delayed states. */
+  renderFrame(tick:ObservationTick):SimulationFrame;
   dispose():void;
 }
+export type ObservationTick=Pick<SimulationFrame,'timeSec'|'readings'>;
 function freezeInput<T>(value:T):T {
   if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.freeze(value);for(const child of Object.values(value))freezeInput(child);}
   return value;
@@ -241,6 +248,18 @@ export function createSimulationSession(scenario:Scenario,environment:Environmen
   let cache:Cache|undefined=prepareCache(s,e);
   let pending:{target:number;times:number[];states:Map<number,EngineState>}|undefined;
   const targetAt=(requestedTimeSec:number)=>{if(!cache)throw new Error('Simulation session is disposed');if(!Number.isFinite(requestedTimeSec)||requestedTimeSec<0)throw new Error('Invalid simulation time');return Math.floor(Math.min(requestedTimeSec,s.config.durationSec)/5)*5;};
+  const prepareState=(requestedTimeSec:number,maxSteps:number)=>{
+    const target=targetAt(requestedTimeSec);if(!Number.isSafeInteger(maxSteps)||maxSteps<1)throw new Error('Invalid preparation step budget');
+    if(pending?.target!==target){const times=new Set([target]);for(const sensor of s.sensors.filter(sensor=>sensor.enabled&&!sensor.archived)){for(const time of deliverySampleTimes(sensor,target))times.add(time);}pending={target,times:[...times].sort((a,b)=>a-b),states:new Map()};}
+    let budget=maxSteps;
+    for(const time of pending.times){
+      if(pending.states.has(time))continue;
+      const start=nearestState(cache!,time).timeSec,until=Math.min(time,start+budget*5),state=advance(s,e,cache!,until);budget-=(until-start)/5;
+      if(until<time)return undefined;
+      pending.states.set(time,state);if(budget===0&&pending.states.size<pending.times.length)return undefined;
+    }
+    const ready={state:pending.states.get(target)!,observedStates:pending.states};pending=undefined;return ready;
+  };
   return {
     get timeSec(){return cache?.last.timeSec??0;},
     get checkpointCount(){return cache?.checkpoints.size??0;},
@@ -249,17 +268,12 @@ export function createSimulationSession(scenario:Scenario,environment:Environmen
       return frameFromState(s,e,cache!,advance(s,e,cache!,target));
     },
     prepareFrame(requestedTimeSec:number,maxSteps=12){
-      const target=targetAt(requestedTimeSec);if(!Number.isSafeInteger(maxSteps)||maxSteps<1)throw new Error('Invalid preparation step budget');
-      if(pending?.target!==target){const times=new Set([target]);for(const sensor of s.sensors.filter(sensor=>sensor.enabled&&!sensor.archived)){for(const time of deliverySampleTimes(sensor,target))times.add(time);}pending={target,times:[...times].sort((a,b)=>a-b),states:new Map()};}
-      let budget=maxSteps;
-      for(const time of pending.times){
-        if(pending.states.has(time))continue;
-        const start=nearestState(cache!,time).timeSec,until=Math.min(time,start+budget*5),state=advance(s,e,cache!,until);budget-=(until-start)/5;
-        if(until<time)return undefined;
-        pending.states.set(time,state);if(budget===0&&pending.states.size<pending.times.length)return undefined;
-      }
-      const frame=frameFromState(s,e,cache!,pending.states.get(target)!,pending.states);pending=undefined;return frame;
+      const ready=prepareState(requestedTimeSec,maxSteps);return ready?frameFromState(s,e,cache!,ready.state,ready.observedStates):undefined;
     },
+    prepareReadings(requestedTimeSec:number,maxSteps=12){
+      const ready=prepareState(requestedTimeSec,maxSteps);return ready?{timeSec:ready.state.timeSec,readings:readingsFromState(s,e,cache!,ready.state,ready.observedStates)}:undefined;
+    },
+    renderFrame(tick:ObservationTick){if(targetAt(tick.timeSec)!==tick.timeSec)throw new Error('Invalid render tick');return renderReadingFrame(s,e,cache!,tick);},
     dispose(){cache?.checkpoints.clear();cache=undefined;pending=undefined;},
   };
 }
@@ -271,6 +285,6 @@ export function createCheckpoint(scenario:Scenario,environment:EnvironmentSnapsh
 export function restoreCheckpoint(scenario:Scenario,environment:EnvironmentSnapshot,checkpoint:SimulationCheckpoint):void {
   if(checkpoint.scenarioId!==scenario.id||checkpoint.revision!==scenario.revision||checkpoint.environmentId!==environment.id||checkpoint.engineVersion!==ENGINE_VERSION||checksum(checkpoint.state)!==checkpoint.checksum)throw new Error('Incompatible or damaged checkpoint');
   const payload=checkpoint.state as {inputHash:string;arrival:(number|null)[];sensorState:EngineState};if(payload.inputHash!==keyFor(scenario,environment))throw new Error('Checkpoint input mismatch');
-  caches.set(payload.inputHash,{arrival:Float64Array.from(payload.arrival,a=>a??Infinity),checkpoints:new Map([[0,initialState(scenario,environment)],[checkpoint.timeSec,structuredClone(payload.sensorState)]]),last:structuredClone(payload.sensorState)});
+  caches.set(payload.inputHash,{arrival:Float64Array.from(payload.arrival,a=>a??Infinity),checkpoints:new Map([[0,initialState(scenario,environment)],[checkpoint.timeSec,structuredClone(payload.sensorState)]]),checkpointTimes:checkpoint.timeSec===0?[0]:[0,checkpoint.timeSec],last:structuredClone(payload.sensorState),profiles:environment.landscape.cells.map(combustionProfile),geometry:observationGeometry(environment.landscape),maxCheckpoints:Math.max(2,Math.floor(MAX_SENSOR_CHECKPOINTS/Math.max(1,scenario.sensors.length)))});
 }
 export function replayFromCheckpoint(scenario:Scenario,environment:EnvironmentSnapshot,checkpoint:SimulationCheckpoint,timeSec:number):SimulationFrame {restoreCheckpoint(scenario,environment,checkpoint);return simulateFrame(scenario,environment,timeSec);}

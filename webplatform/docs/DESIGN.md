@@ -1,5 +1,13 @@
 # Dryspell geographic workspace
 
+## Current anonymous sandbox revision (sandbox-v4)
+
+The latest compact simulator supersedes the original platform composition below. Actual Chrome comparison of `?composition=shelf` and `?composition=strip` used the same saved Glendalough terrain/weather fixture. The three-tool shelf is selected: Select, Add sensor and Fire sit immediately above the time rail, keeping placement and Run together. The map fills the viewport, with one contextual inspector and a small weather-summary control. Captures: `output/playwright/compact-composition-shelf.png` and `compact-composition-strip.png`; full current decision and checks are in [SANDBOX_DESIGN.md](SANDBOX_DESIGN.md).
+
+Current tokens retain graphite instruments, warm orange fire, violet wind, visible green woodland, beige cropland, grey built areas and blue water. Sensor symbols carry one anchored 11–15px zoom-scaled line, without leader arrows. Settings precede charts inside the selected object's inspector. End hours and the UTC date/hour picker belong to the bottom transport. At narrow widths the transport uses an action row and a separate scrubber row; at short viewport heights the inspector is a bounded scrolling overlay. Compact widths expose fire-state meanings inside Layers instead of an overlapping floating key. Exact style tokens, symbol and response rules are documented with the implemented sandbox composition.
+
+The following studies describe the original authenticated platform and remain historical evidence.
+
 Composition decision recorded before implementation, 14 November 2026. Contract 1.0.0.
 
 The landscape is the working document. Tools sit at its edge; time is a continuous rail at the bottom. The visual identity comes from survey-style selection brackets, profile-specific field instruments and the correspondence between effective terrain, fire and time. No decorative topology or network connectors are used.

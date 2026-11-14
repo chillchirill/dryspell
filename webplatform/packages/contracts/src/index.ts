@@ -16,6 +16,11 @@ export type Context = 'simulation' | 'live' | 'history';
 export interface SensorStatus { sensorId: string; state: 'waiting'|'online'|'stale'|'offline'|'disabled'|'archived'; freshness:'missing'|'fresh'|'stale'; lastRecordedAt:string|null; lastReceivedAt:string|null; evaluatedAt:string; expectedIntervalSec:number; }
 export interface SimulationFault { type: 'dropout'|'stuck'|'spike'|'delay'|'smoke-without-fire'; startTimeSec: number; endTimeSec: number; channels?: Channel[]; value?: number; delaySec?: number; }
 export interface Sensor { id: string; deviceId: string; name: string; source: 'real' | 'simulated'; location: Coordinate; profileId: ProfileId; capabilities: Channel[]; expectedIntervalSec: number; enabled: boolean; archived?: boolean; tags: string[]; createdAt: string; updatedAt: string; locationVersion?: number; calibration?: Partial<Record<Channel, number>>; simulationFaults?: SimulationFault[]; hardware?: { model?: string; temperatureRangeC?: { min: number; max: number } }; }
+/** Local simulated devices may disable any subset of their profile's channels. Real-device API rules are unchanged. */
+export function validSimulationChannels(sensor:Pick<Sensor,'profileId'|'capabilities'|'enabled'>):boolean {
+  const profile=SENSOR_PROFILES[sensor.profileId];
+  return !!profile&&(!sensor.enabled||sensor.capabilities.length>0)&&new Set(sensor.capabilities).size===sensor.capabilities.length&&sensor.capabilities.every(channel=>profile.capabilities.includes(channel));
+}
 export type QualityFlag = 'server-time' | 'late' | 'stale' | 'saturated' | 'fault' | 'clock-skew' | 'missing';
 export interface TelemetryPacket { deviceId: string; messageId?: string; recordedAt?: string; temperatureC?: number; humidityPct?: number; smokePct?: number; smoke?: boolean; batteryVoltage?: number; extra?: Record<string, unknown>; }
 export interface ValidatedObservation { id: string; sensorId: string; source: 'real' | 'simulated'; scenarioId?: string; revision?: number; recordedAt: string; receivedAt: string; simulationTimeSec?: number; location: Coordinate; locationVersion: number; values: Partial<Record<Channel, number>>; smoke?: boolean; quality: QualityFlag[]; }
@@ -36,7 +41,9 @@ export interface Ignition { id: string; location: Coordinate; timeSec: number; }
 export interface SimulationConfig { durationSec: number; outputIntervalSec: number; checkpointIntervalSec: number; responseRadiusM: number; temperatureGainC: number; burnDurationSec: number; timeZone: string; }
 export const DEFAULT_SIMULATION_CONFIG: SimulationConfig = { durationSec: 21600, outputIntervalSec: 5, checkpointIntervalSec: 60, responseRadiusM: 50, temperatureGainC: 90, burnDurationSec: 180, timeZone: 'UTC' };
 export interface Scenario { id: string; name: string; revision: number; status: 'draft' | 'running' | 'paused' | 'completed' | 'failed'; seed: number; startTime: string; environmentId: string; sensors: Sensor[]; ignitions: Ignition[]; config: SimulationConfig; authoritativeTimeSec: number; createdAt: string; updatedAt: string; }
-export interface SimulationFrame { scenarioId: string; revision: number; environmentId: string; timeSec: number; timestamp: string; engineVersion: string; burningCells: number[]; burnedCells: number[]; readings: ValidatedObservation[]; weather: WeatherSample; checksum: string; }
+/** Illustrative two-component surface fuel state; source terms use horizontal area. */
+export interface CombustionCell { cell: number; phase:'flaming'|'residual'; intensity:number; fuelRemainingKgM2:number; heatFluxWm2:number; smokeFluxKgM2Sec:number; }
+export interface SimulationFrame { scenarioId: string; revision: number; environmentId: string; timeSec: number; timestamp: string; engineVersion: string; burningCells: number[]; burnedCells: number[]; combustion?:CombustionCell[]; readings: ValidatedObservation[]; weather: WeatherSample; checksum: string; }
 export interface SimulationCheckpoint { scenarioId: string; revision: number; timeSec: number; engineVersion: string; environmentId: string; state: unknown; checksum: string; }
 export interface FireHypothesis { location: Coordinate; ignitionTime: string; weight: number; }
 export interface FirePosterior { hypotheses: FireHypothesis[]; noFireProbability: number; processedObservationIds: string[]; sensorMemory?: Record<string,{recordedAt:string;temperatureAnomaly?:number;smokePct?:number;consecutiveAbnormal:number}>; }

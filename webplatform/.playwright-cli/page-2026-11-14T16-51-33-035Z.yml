@@ -1,0 +1,46 @@
+- main [ref=f1e1]:
+  - link "Skip to object tools" [ref=f1e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Terrain map" [ref=f1e3]:
+    - region "Map" [ref=f1e4]
+    - generic:
+      - generic [ref=f1e5]:
+        - button "Zoom in" [ref=f1e6] [cursor=pointer]
+        - button "Zoom out" [ref=f1e8] [cursor=pointer]
+      - generic: 500 m
+      - group [ref=f1e11]:
+        - generic "Toggle attribution" [ref=f1e12] [cursor=pointer]
+        - generic [ref=f1e13]: Esri, HERE, Garmin, © OpenStreetMap contributors, GIS user community
+  - group [ref=f1e14]:
+    - generic "Layers" [ref=f1e15] [cursor=pointer]
+  - generic:
+    - text: Flaming Residual heat Burned
+    - generic: Simulated
+  - generic [ref=f1e16]:
+    - generic [ref=f1e17]:
+      - strong [ref=f1e18]: Dryspell
+      - generic [ref=f1e19]: Test mode
+    - button "Experiment menu" [ref=f1e20] [cursor=pointer]
+  - button "Weather settings" [ref=f1e22] [cursor=pointer]:
+    - generic [aria-hidden] [ref=f1e23]: ↑
+    - generic [ref=f1e24]: Weather unavailable
+  - status [ref=f1e25]: Preparing the landscape…
+  - generic:
+    - toolbar "Object tools" [ref=f1e27]:
+      - button "Select" [pressed] [ref=f1e28] [cursor=pointer]
+      - button "Add sensor" [disabled] [ref=f1e32]
+      - button "Fire" [disabled] [ref=f1e38]
+    - generic [ref=f1e42]:
+      - button "Run" [disabled] [ref=f1e43]
+      - button "Rewind to start" [disabled] [ref=f1e47]
+      - status "Simulation time" [ref=f1e51]: 0:00
+      - slider "Simulation timeline" [disabled] [ref=f1e52] [cursor=pointer]: "0"
+      - generic "Experiment duration in hours. Enter or leave the field to apply." [ref=f1e53]:
+        - spinbutton "Duration in hours" [disabled] [ref=f1e54]: "6"
+        - text: h
+      - button "Choose start date" [ref=f1e55] [cursor=pointer]:
+        - generic [ref=f1e58]: Date
+      - group [ref=f1e59]:
+        - generic "10×" [ref=f1e60] [cursor=pointer]
+      - button "Undo last edit" [disabled] [ref=f1e63]
+      - button "Object list" [ref=f1e67] [cursor=pointer]

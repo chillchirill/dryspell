@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-11-14T15:46:42.468Z",
+  "mode": "Actual compiled HTTP and live Open-Meteo; explicit bundled demo checked separately",
+  "results": [
+    {
+      "name": "Cherkasy",
+      "latitude": 49.44,
+      "longitude": 32.06,
+      "id": "openmeteo-e043a7ddacc0d761814d",
+      "issuedAt": "2026-11-14T15:46:42.197Z",
+      "validAt": "2026-11-14T15:46:38.370Z",
+      "sampleTimeSec": 0,
+      "windFromDeg": 268.4453110044469,
+      "windSpeedMps": 2.2997574700019086,
+      "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=49.44&longitude=32.06&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&past_hours=2&forecast_hours=16"
+    },
+    {
+      "name": "California",
+      "latitude": 38.5,
+      "longitude": -122.5,
+      "id": "openmeteo-3a160cb057b88fd71061",
+      "issuedAt": "2026-11-14T15:46:42.057Z",
+      "validAt": "2026-11-14T15:46:38.370Z",
+      "sampleTimeSec": 0,
+      "windFromDeg": 336.3264281437195,
+      "windSpeedMps": 0.4160964407713476,
+      "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=38.5&longitude=-122.5&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&past_hours=2&forecast_hours=16"
+    }
+  ],
+  "demo": {
+    "id": "demo-weather-956b0e2d3372b12f40cd",
+    "source": {
+      "provider": "Dryspell saved dry-weather demonstration",
+      "sourceUrl": "local:data/sample/environment.json",
+      "version": "reference-v1",
+      "retrievedAt": "2026-11-14T15:46:42.446Z",
+      "validAt": "2026-11-14T15:46:38.370Z",
+      "license": "CC0-1.0",
+      "attribution": "Explicit synthetic dry-weather demonstration; not current conditions",
+      "checksum": "956b0e2d3372b12f40cdb4e5b97bee5b0bc17d6cb8dded25f92ff43174fe48c7",
+      "sample": true,
+      "parameters": {
+        "referenceTime": "2026-07-01T12:00:00Z",
+        "referenceId": "sample-dry-westerly-v1",
+        "weatherMode": "demo",
+        "extensionPolicy": "hold-last-conditions",
+        "forecastEndSec": 21600,
+        "extensionEndSec": 45000
+      }
+    },
+    "endSec": 45000
+  },
+  "map": {
+    "status": 200,
+    "palette": "dryspell-natural-v2",
+    "etag": "\"dryspell-natural-v2-landcover-12-1975-1333-a9cc95251056a0c1c54276cf07628bf20dcb22caaf825db6dd16315f57568ed6\""
+  }
+}

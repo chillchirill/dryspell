@@ -53,3 +53,37 @@ Implemented explicit current-map preparation, coordinate/width entry, loading/ca
 Coordinator browser review remains required for actual cold area acquisition, an unavailable area with the previous experiment intact, cancellation/stale responses, decimal and long durations, extended-weather labels, and desktop/mobile control collisions. No new provider/browser/deployment success is claimed by the frontend agent.
 
 Final checks for this revision: workspace `npm run typecheck` completed with exit 0; the six focused test files completed with **38 passed** after adding a delayed-arrival regression. History retention and chart horizontal positions use receipt time; freshness continues to use observation time. No build or browser was run by this frontend agent.
+
+
+## V2 incremental UI review
+
+The source revision exposes hours/Apply directly on the timeline; API/manual/demo wind directly on the map; and a separately labelled map-center weather preview. Fresh scenes seed 30 valid-land sensors and add a 31st normally. Restored scenes do not reseed. Every marker has persistent capability-aware values and its own severity ring; the list fallback displays the same values. Label displacement uses leader lines, and effective-area camera padding is reduced. Combustion phase/intensity drives flame/residual/burned appearance.
+
+The coordinator is building a candidate for actual desktop/320 px inspection. This agent has not executed or claimed those browser checks. Required review includes 30-label legibility, wind/time target reachability, manual-wind persistence and extension, API refresh failure/demo fallback, preview isolation during pan, and matching frames after rewind. Focused tests and final typecheck results are reported in the handoff.
+
+Final focused execution: `npx vitest run apps/sandbox/src/ui apps/sandbox/src/canvas` passed **8 files / 50 tests**. Added deterministic land seeding, 31/500-sensor storage, manual zero-wind persistence, explicit demo admission, missing/unsupported/zero reading distinctions, warning persistence and recovery-hysteresis cases. Workspace typecheck completed with exit 0. These are software behavior checks, not physical calibration. The coordinator owns candidate browser evidence and any further visual corrections.
+
+
+### Actual capture correction: label and mobile control collisions
+
+Viewed the coordinator's `output/playwright/v2-controls-desktop.png` (1280 × 720) and `output/playwright/v2-controls-mobile-before.png` (390 × 844). Confirmed overlapping marker readouts, labels underneath bottom controls, tiny text, and an expanded mobile legend covering wind controls. The finite nearby-position search incorrectly fell back to an occupied location.
+
+Replaced that fallback with deterministic free-rectangle packing. It reserves actual instrument rectangles, all marker hit areas, other labels, and viewport edges. Readouts use 12 px values in fixed 118 × 72 px boxes; leader lines connect displaced labels. Structural UI resize and inspector changes trigger layout, while ordinary numeric updates do not shuffle labels. If no legal rectangle exists, the marker remains and a visible Sensor list action reports how many labels need room; the synchronized list keeps every measurement accessible. The default legend is collapsed; mobile expanded layers remain in their own column and no longer widen across wind controls. Manual input defaults are rounded for display only.
+
+Focused geometry tests use the captured desktop's controls/markers and require all 30 labels without intersections; an insufficient mobile-space case requires collision-free fallback. They passed. Coordinator rebuilding/reinspection must confirm actual DOM geometry, reading legibility and mobile hit targets after this correction. Dense 500-object label visibility/performance remains outside the verified default workload.
+
+
+### Native 200% zoom inspector correction (S10 P2)
+
+The reviewer reproduced a 44 px inspector at a 720 × 450 CSS viewport. The referenced failure capture had already been removed when this agent tried to open it; the conflicting `top:270px` and height-based maximum were confirmed in source. At viewport heights at or below 650 px, the inspector now occupies a bounded 12 px inset overlay with an independently scrolling content region. Close remains fixed outside that region, and focused form controls have scroll padding. This preserves usable fields at native zoom without changing the normal-height composition. The generic recovery copy now says “Model updated; run again.” Browser rerun remains reviewer-owned.
+
+
+## Compact sandbox-v4 source review — 14 November 2026
+
+Implemented the user-requested structural simplification: one fresh sensor, one Add sensor tool, direct one-line readings, selected-sensor channel/enable settings, compact end duration, historical UTC date/hour picker, 150×/300× playback, collapsed weather into the single inspector, and explicit click-confirm regional preparation. Removed automatic pan-preview requests and the permanent area-action panel. Preserved stored scenes, legacy profiles, arbitrary positive duration, asynchronous cancellation/stale-response guards, Undo, import/export and the effective numerical overlay.
+
+Vercel interface review applied to the changed source: labelled native inputs/buttons, keyboard slider/date controls, semantic loading status, explicit UTC formatting, constrained popovers and short-height scrolling, and no new gesture-only operation. The disabled/no-data/unsupported distinction remains visible. Dense sensor lists use content-visibility; simulation readout updates no longer copy the entire cache for each sensor. This source review is not a claim of browser verification.
+
+Executed before handoff: `node node_modules/vitest/vitest.mjs run apps/sandbox/src/ui apps/sandbox/src/canvas` — 10 files / 61 tests passed. The focused tests cover one-sensor deterministic land seeding, valid subsets/disabled imports, distinct compact reading states, date bounds/hour precision, historical origin preservation, five-minute current-weather reuse, and batched intermediate high-speed observations. Workspace TypeScript passed after the backend weather module was restored (an earlier run encountered that in-progress missing module).
+
+Current browser acceptance remains with coordinator/independent reviewer after source freeze: fresh landscape→one sensor before weather→fire→Run→150×/300×→pause→rewind; sensor channels/disable; historical day/hour selection and actual archive provenance; past Run/area/duration origin invariance; region-confirm cancel/pan/Escape/error; desktop and 390/320 CSS px/native200% layout. No new provider success, archive acquisition, performance result, or browser capture is claimed by this frontend handoff.

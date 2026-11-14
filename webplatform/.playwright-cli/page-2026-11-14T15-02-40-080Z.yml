@@ -1,0 +1,76 @@
+- main [ref=e1]:
+  - link "Skip to object tools" [ref=e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Terrain map" [ref=e3]:
+    - region "Map" [ref=e4]
+    - generic:
+      - generic [ref=e5]:
+        - button "Zoom in" [ref=e6] [cursor=pointer]
+        - button "Zoom out" [ref=e8] [cursor=pointer]
+      - generic: 500 m
+      - group [ref=e11]:
+        - generic "Toggle attribution" [ref=e12] [cursor=pointer]
+        - generic [ref=e13]: Esri, HERE, Garmin, © OpenStreetMap contributors, GIS user community
+  - generic [ref=e14]:
+    - group "Map layers" [ref=e15]:
+      - button "Land cover" [pressed] [ref=e16] [cursor=pointer]
+      - button "Ecological zones" [ref=e17] [cursor=pointer]
+    - generic [ref=e18]:
+      - button "Use this area" [ref=e19] [cursor=pointer]
+      - generic [ref=e20]: New experiment at map centre
+    - group [ref=e21]:
+      - generic "Legend 25 m simulation grid inside outline" [ref=e22] [cursor=pointer]:
+        - text: Legend
+        - generic [ref=e23]: 25 m simulation grid inside outline
+      - generic [ref=e24]:
+        - generic [ref=e25]: Forest
+        - generic [ref=e27]: Shrubland
+        - generic [ref=e29]: Grassland
+        - generic [ref=e31]: Cropland
+        - generic [ref=e33]: Built-up
+        - generic [ref=e35]: Water
+        - generic [ref=e37]: Bare / sparse
+      - paragraph [ref=e39]: ESA WorldCover 2021 regional context; 10 m source. The outlined area always shows the effective land cover used by this run.
+  - generic:
+    - text: Flaming Residual heat Burned
+    - generic: Simulated
+  - generic [ref=e40]:
+    - generic [ref=e41]:
+      - strong [ref=e42]: Dryspell
+      - generic [ref=e43]: Test mode
+    - button "Experiment menu" [ref=e44] [cursor=pointer]
+  - region "Wind controls" [ref=e46]:
+    - generic [ref=e47]:
+      - strong [ref=e48]: API run weather
+      - generic [aria-hidden] [ref=e49]: ↑
+    - paragraph [ref=e50]: Getting weather…
+    - group "Wind source" [ref=e51]:
+      - button "Use API wind" [disabled] [pressed] [ref=e52]
+      - button "Manual wind" [disabled] [ref=e53]
+    - button "Use saved demo weather" [disabled] [ref=e54]
+  - status [ref=e55]: Preparing the landscape…
+  - generic:
+    - toolbar "Object tools" [ref=e57]:
+      - button "Select" [pressed] [ref=e58] [cursor=pointer]
+      - button "Combined" [disabled] [ref=e62]
+      - button "Temperature" [disabled] [ref=e68]
+      - button "Humidity" [disabled] [ref=e72]
+      - button "Smoke" [disabled] [ref=e77]
+      - button "Fire" [disabled] [ref=e81]
+    - generic [ref=e85]:
+      - generic [ref=e86]:
+        - generic [ref=e87]:
+          - text: Duration in hours
+          - spinbutton "Duration in hours" [ref=e88]: "6"
+        - button "Updating weather…" [disabled] [ref=e89]
+      - generic [ref=e90]: Simulation time
+    - generic [ref=e91]:
+      - button "Run" [disabled] [ref=e92]
+      - button "Rewind to start" [disabled] [ref=e96]
+      - status "Simulation time" [ref=e100]: 0:00
+      - slider "Simulation timeline" [disabled] [ref=e101] [cursor=pointer]: "0"
+      - generic [ref=e102]: 6 h
+      - group [ref=e103]:
+        - generic "10×" [ref=e104] [cursor=pointer]
+      - button "Undo last edit" [disabled] [ref=e107]
+      - button "Object list" [ref=e111] [cursor=pointer]

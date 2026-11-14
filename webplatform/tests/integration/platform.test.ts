@@ -1,20 +1,42 @@
 import {beforeAll,describe,it,expect} from 'vitest';
+import {randomUUID} from 'node:crypto';
 import dotenv from 'dotenv';
 import WebSocket from 'ws';
 import pg from 'pg';
 import type {Scenario,Sensor,EnvironmentSnapshot,SimulationFrame,WsEnvelope} from '@dryspell/contracts';
+// Capture deliberate process opt-in before dotenv. A local .env.test file
+// alone must never activate this mutating integration suite.
+const enabled=process.env.RUN_DB_TESTS==='1';
 dotenv.config({path:'.env.test',quiet:true});
-dotenv.config({quiet:true});
 const base=process.env.DRYSPELL_BASE_URL??'http://127.0.0.1:4000';
-let cookie='',csrf='';
+let cookie='',csrf='',testDatabaseUrl='';
 async function request(path:string,method='GET',body?:unknown,auth=true){
-  const response=await fetch(base+'/api/v1'+path,{method,headers:{'content-type':'application/json',...(auth?{cookie,'x-csrf-token':csrf}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+  const response=await fetch(base+'/api/v1'+path,{method,signal:AbortSignal.timeout(10000),headers:{'content-type':'application/json',...(auth?{cookie,'x-csrf-token':csrf}:{})},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await response.json();return {response,data};
 }
 const unique=()=>`check-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-describe('actual PostgreSQL, HTTP, worker and WS integration',()=>{
+describe.skipIf(!enabled)('actual PostgreSQL, HTTP, worker and WS integration',()=>{
   beforeAll(async()=>{
-    const response=await fetch(base+'/api/v1/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:process.env.DRYSPELL_TEST_USERNAME,password:process.env.DRYSPELL_TEST_PASSWORD})});
+    const connection=process.env.TEST_DATABASE_URL;
+    if(!connection||!new URL(connection).pathname.endsWith('_test'))throw new Error('Explicit TEST_DATABASE_URL naming a dedicated *_test database is required. DATABASE_URL is not a fallback.');
+    if(!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname))throw new Error('Platform integration only targets a local loopback test server.');
+    testDatabaseUrl=connection;
+    const guardPool=new pg.Pool({connectionString:testDatabaseUrl,max:1,connectionTimeoutMillis:5000});
+    try{
+      const expectedName=decodeURIComponent(new URL(testDatabaseUrl).pathname.slice(1));
+      expect((await guardPool.query('SELECT current_database() AS name')).rows[0].name).toBe(expectedName);
+      // The only preflight write is a disposable UUID probe in the explicitly
+      // selected test database. HTTP remains read-only until the API proves it
+      // reads that same database; a live/main server will return 404 instead.
+      const probeId='platform-binding-'+randomUUID(),now=new Date().toISOString();
+      const probe:Sensor={id:probeId,deviceId:probeId,name:'Disposable platform-test database binding probe',source:'real',profileId:'temperature',capabilities:['temperatureC'],location:{longitude:0,latitude:0},expectedIntervalSec:60,enabled:false,tags:['platform-binding-probe'],createdAt:now,updatedAt:now};
+      await guardPool.query('INSERT INTO sensors(id,device_id,document,location) VALUES($1,$1,$2,ST_SetSRID(ST_MakePoint(0,0),4326)::geography)',[probeId,JSON.stringify(probe)]);
+      try{
+        const observed=await request(`/sensors/${probeId}`,'GET',undefined,false);
+        if(observed.response.status!==200||observed.data.id!==probeId)throw new Error('Target HTTP server is not connected to TEST_DATABASE_URL. No HTTP mutation was attempted.');
+      }finally{await guardPool.query('DELETE FROM sensors WHERE id=$1',[probeId]);}
+    }finally{await guardPool.end();}
+    const response=await fetch(base+'/api/v1/auth/login',{method:'POST',signal:AbortSignal.timeout(10000),headers:{'content-type':'application/json'},body:JSON.stringify({username:process.env.DRYSPELL_TEST_USERNAME,password:process.env.DRYSPELL_TEST_PASSWORD})});
     expect(response.status).toBe(200);cookie=response.headers.get('set-cookie')!.split(';')[0];csrf=(await response.json()).csrfToken;
   });
   it('denies unauthenticated, CSRF and foreign-origin mutations',async()=>{
@@ -41,7 +63,7 @@ describe('actual PostgreSQL, HTTP, worker and WS integration',()=>{
       await expect.poll(()=>received.some(e=>e.type==='sensor.reading'&&(e.payload as any).sensorId===sensor.id),{timeout:10000}).toBe(true);
       const history=await request(`/sensors/${sensor.id}/readings`);const rows=Array.isArray(history.data)?history.data:history.data.readings;
       expect(rows[0].values.humidityPct).toBe(0);expect(rows[0].values.smokePct).toBe(0);
-      const pool=new pg.Pool({connectionString:process.env.TEST_DATABASE_URL||process.env.DATABASE_URL,max:1});
+      const pool=new pg.Pool({connectionString:testDatabaseUrl,max:1,connectionTimeoutMillis:5000});
       try{const persisted=await pool.query('SELECT count(*)::int AS n FROM telemetry WHERE sensor_id=$1',[sensor.id]);expect(persisted.rows[0].n).toBe(1);}finally{await pool.end();}
       // Partial packet has no fabricated channels; late packet cannot replace newer latest.
       const partial=await ingest({deviceId:id,messageId:unique(),recordedAt:sensor.createdAt,smokePct:12});expect(partial.ok,await partial.text()).toBe(true);

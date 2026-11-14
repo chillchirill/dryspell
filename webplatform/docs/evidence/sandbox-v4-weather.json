@@ -1,0 +1,312 @@
+{
+  "checkedAt": "2026-11-14T16:56:58.124Z",
+  "origin": "http://127.0.0.1:4001",
+  "interceptions": false,
+  "catalogue": {
+    "availableFrom": "1940-01-01T00:00:00.000Z",
+    "latestHistoricalStart": "2026-11-08T23:00:00.000Z",
+    "stepSec": 3600,
+    "localArchive": {
+      "id": "ireland-era5-2026-01-01-2026-11-08-0.5deg",
+      "status": "ready",
+      "bounds": {
+        "west": -11,
+        "east": -5,
+        "south": 51,
+        "north": 55.5
+      },
+      "startTime": "2026-01-01T00:00:00.000Z",
+      "endTime": "2026-11-08T23:00:00.000Z",
+      "spacingDeg": 0.5,
+      "pointCount": 130,
+      "provider": "Open-Meteo / Copernicus ERA5",
+      "attribution": "ERA5 reanalysis (Copernicus Climate Change Service / ECMWF), distributed by Open-Meteo.com; CC BY 4.0"
+    }
+  },
+  "download": {
+    "pointCount": 130,
+    "hourlyPointRows": 973440,
+    "compressedBytes": 4807965,
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-11-08T23:00:00.000Z",
+    "allCompressedPointChecksumsAndFiveHourlyColumnsVerified": true,
+    "manifestSha256": "1a7776b9a65ad9039ebc94b258ce5d5867a0b8dba942a57826ec99a65fe36196"
+  },
+  "local": {
+    "elapsedMs": 21,
+    "id": "openmeteo-a79af3c2565e643f96da",
+    "validAt": "2026-07-01T12:00:00.000Z",
+    "sampleCount": 7,
+    "firstSample": {
+      "timeSec": 0,
+      "temperatureC": 16.6,
+      "humidityPct": 72,
+      "windSpeedMps": 4.39,
+      "windFromDeg": 223,
+      "precipitationMm": 0
+    },
+    "provenance": [
+      {
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://archive-api.open-meteo.com/v1/archive?latitude=53%2C53&longitude=-7%2C-6.5&start_date=2026-01-01&end_date=2026-11-08&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&models=era5&elevation=nan%2Cnan&cell_selection=nearest&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&timeformat=unixtime",
+        "version": "era5-hourly",
+        "retrievedAt": "2026-11-14T16:48:21.746Z",
+        "validAt": "2026-07-01T12:00:00.000Z",
+        "resolutionM": 27830,
+        "license": "CC BY 4.0; hosted non-commercial API",
+        "attribution": "ERA5 reanalysis (Copernicus Climate Change Service / ECMWF), distributed by Open-Meteo.com; CC BY 4.0",
+        "checksum": "a79af3c2565e643f96da9adb8b3dea36dc694fdc66f86c62cdd9ed4d5b0075a8",
+        "sample": false,
+        "parameters": {
+          "latitude": 53.025,
+          "longitude": -6.3515,
+          "weatherMode": "historical",
+          "dataKind": "retrospective-reanalysis",
+          "windUnit": "m/s",
+          "windDirectionConvention": "meteorological direction from",
+          "precipitationInterval": "preceding hour",
+          "issueTimeMeaning": "retrieval availability; provider issue time unavailable",
+          "forecastEndSec": 21600,
+          "coverageEndSec": 21600,
+          "maxHistoricalFetchDays": 31,
+          "storage": "local-archive",
+          "archiveId": "ireland-era5-2026-01-01-2026-11-08-0.5deg",
+          "archivePointChecksum": "63be47880a48ca6b51ff662f9f7c5cff5daee4337880c770d86bb47bbeed6c7e",
+          "spatialMethod": "nearest downloaded 0.5-degree sample; provider nearest ERA5 cell",
+          "sampleSpacingDeg": 0.5,
+          "nativeResolutionDeg": 0.25,
+          "requestedCoordinate": {
+            "latitude": 53.025,
+            "longitude": -6.3515
+          },
+          "sampleCoordinate": {
+            "latitude": 53,
+            "longitude": -6.5
+          },
+          "sourceCoordinate": {
+            "latitude": 53,
+            "longitude": -6.5
+          },
+          "sourceElevationM": 199
+        }
+      }
+    ]
+  },
+  "localRepeat": {
+    "elapsedMs": 9,
+    "id": "openmeteo-a79af3c2565e643f96da",
+    "validAt": "2026-07-01T12:00:00.000Z",
+    "sampleCount": 7,
+    "firstSample": {
+      "timeSec": 0,
+      "temperatureC": 16.6,
+      "humidityPct": 72,
+      "windSpeedMps": 4.39,
+      "windFromDeg": 223,
+      "precipitationMm": 0
+    },
+    "provenance": [
+      {
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://archive-api.open-meteo.com/v1/archive?latitude=53%2C53&longitude=-7%2C-6.5&start_date=2026-01-01&end_date=2026-11-08&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&models=era5&elevation=nan%2Cnan&cell_selection=nearest&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&timeformat=unixtime",
+        "version": "era5-hourly",
+        "retrievedAt": "2026-11-14T16:48:21.746Z",
+        "validAt": "2026-07-01T12:00:00.000Z",
+        "resolutionM": 27830,
+        "license": "CC BY 4.0; hosted non-commercial API",
+        "attribution": "ERA5 reanalysis (Copernicus Climate Change Service / ECMWF), distributed by Open-Meteo.com; CC BY 4.0",
+        "checksum": "a79af3c2565e643f96da9adb8b3dea36dc694fdc66f86c62cdd9ed4d5b0075a8",
+        "sample": false,
+        "parameters": {
+          "latitude": 53.025,
+          "longitude": -6.3515,
+          "weatherMode": "historical",
+          "dataKind": "retrospective-reanalysis",
+          "windUnit": "m/s",
+          "windDirectionConvention": "meteorological direction from",
+          "precipitationInterval": "preceding hour",
+          "issueTimeMeaning": "retrieval availability; provider issue time unavailable",
+          "forecastEndSec": 21600,
+          "coverageEndSec": 21600,
+          "maxHistoricalFetchDays": 31,
+          "storage": "local-archive",
+          "archiveId": "ireland-era5-2026-01-01-2026-11-08-0.5deg",
+          "archivePointChecksum": "63be47880a48ca6b51ff662f9f7c5cff5daee4337880c770d86bb47bbeed6c7e",
+          "spatialMethod": "nearest downloaded 0.5-degree sample; provider nearest ERA5 cell",
+          "sampleSpacingDeg": 0.5,
+          "nativeResolutionDeg": 0.25,
+          "requestedCoordinate": {
+            "latitude": 53.025,
+            "longitude": -6.3515
+          },
+          "sampleCoordinate": {
+            "latitude": 53,
+            "longitude": -6.5
+          },
+          "sourceCoordinate": {
+            "latitude": 53,
+            "longitude": -6.5
+          },
+          "sourceElevationM": 199
+        }
+      }
+    ]
+  },
+  "longLocal": {
+    "elapsedMs": 24,
+    "id": "openmeteo-64adfbbd814b789e5d1f",
+    "validAt": "2026-07-01T12:00:00.000Z",
+    "sampleCount": 1001,
+    "firstSample": {
+      "timeSec": 0,
+      "temperatureC": 16.6,
+      "humidityPct": 72,
+      "windSpeedMps": 4.39,
+      "windFromDeg": 223,
+      "precipitationMm": 0
+    },
+    "provenance": [
+      {
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://archive-api.open-meteo.com/v1/archive?latitude=53%2C53&longitude=-7%2C-6.5&start_date=2026-01-01&end_date=2026-11-08&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&models=era5&elevation=nan%2Cnan&cell_selection=nearest&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&timeformat=unixtime",
+        "version": "era5-hourly",
+        "retrievedAt": "2026-11-14T16:48:21.746Z",
+        "validAt": "2026-07-01T12:00:00.000Z",
+        "resolutionM": 27830,
+        "license": "CC BY 4.0; hosted non-commercial API",
+        "attribution": "ERA5 reanalysis (Copernicus Climate Change Service / ECMWF), distributed by Open-Meteo.com; CC BY 4.0",
+        "checksum": "64adfbbd814b789e5d1f69683f6ca38549dceefe5fdee6eb1448fa0917721745",
+        "sample": false,
+        "parameters": {
+          "latitude": 53.025,
+          "longitude": -6.3515,
+          "weatherMode": "historical",
+          "dataKind": "retrospective-reanalysis",
+          "windUnit": "m/s",
+          "windDirectionConvention": "meteorological direction from",
+          "precipitationInterval": "preceding hour",
+          "issueTimeMeaning": "retrieval availability; provider issue time unavailable",
+          "forecastEndSec": 3600000,
+          "coverageEndSec": 3600000,
+          "maxHistoricalFetchDays": 31,
+          "storage": "local-archive",
+          "archiveId": "ireland-era5-2026-01-01-2026-11-08-0.5deg",
+          "archivePointChecksum": "63be47880a48ca6b51ff662f9f7c5cff5daee4337880c770d86bb47bbeed6c7e",
+          "spatialMethod": "nearest downloaded 0.5-degree sample; provider nearest ERA5 cell",
+          "sampleSpacingDeg": 0.5,
+          "nativeResolutionDeg": 0.25,
+          "requestedCoordinate": {
+            "latitude": 53.025,
+            "longitude": -6.3515
+          },
+          "sampleCoordinate": {
+            "latitude": 53,
+            "longitude": -6.5
+          },
+          "sourceCoordinate": {
+            "latitude": 53,
+            "longitude": -6.5
+          },
+          "sourceElevationM": 199
+        }
+      }
+    ]
+  },
+  "remoteHistorical": {
+    "elapsedMs": 21,
+    "id": "openmeteo-cd25b9cb6edf4161e8e4",
+    "validAt": "2026-07-01T12:00:00.000Z",
+    "sampleCount": 12,
+    "firstSample": {
+      "timeSec": 0,
+      "temperatureC": 29.1,
+      "humidityPct": 45,
+      "windSpeedMps": 2.73,
+      "windFromDeg": 98,
+      "precipitationMm": 0
+    },
+    "provenance": [
+      {
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://archive-api.open-meteo.com/v1/archive?latitude=49.4444&longitude=32.0598&start_date=2026-07-01&end_date=2026-07-01&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&models=era5&elevation=nan&cell_selection=nearest&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&timeformat=unixtime",
+        "version": "era5-hourly",
+        "retrievedAt": "2026-11-14T16:55:50.299Z",
+        "validAt": "2026-07-01T12:00:00.000Z",
+        "resolutionM": 27830,
+        "license": "CC BY 4.0; hosted non-commercial API",
+        "attribution": "ERA5 reanalysis (Copernicus Climate Change Service / ECMWF), distributed by Open-Meteo.com; CC BY 4.0",
+        "checksum": "cd25b9cb6edf4161e8e4e0c37d1677c8e12faee9f79f99f2d3867688adad86c5",
+        "sample": false,
+        "parameters": {
+          "latitude": 49.4444,
+          "longitude": 32.0598,
+          "weatherMode": "historical",
+          "dataKind": "retrospective-reanalysis",
+          "windUnit": "m/s",
+          "windDirectionConvention": "meteorological direction from",
+          "precipitationInterval": "preceding hour",
+          "issueTimeMeaning": "retrieval availability; provider issue time unavailable",
+          "forecastEndSec": 39600,
+          "coverageEndSec": 39600,
+          "maxHistoricalFetchDays": 31,
+          "storage": "remote-persistent-cache",
+          "spatialMethod": "nearest ERA5 model cell; elevation downscaling disabled",
+          "nativeResolutionDeg": 0.25,
+          "requestedCoordinate": {
+            "latitude": 49.4444,
+            "longitude": 32.0598
+          },
+          "sourceCoordinate": {
+            "latitude": 49.5,
+            "longitude": 32
+          },
+          "sourceElevationM": 99
+        }
+      }
+    ]
+  },
+  "current": {
+    "elapsedMs": 11,
+    "id": "openmeteo-35558badda88aede64e9",
+    "validAt": "2026-11-14T16:56:58.110Z",
+    "sampleCount": 11,
+    "firstSample": {
+      "timeSec": 181.89000010490417,
+      "temperatureC": 6.4,
+      "humidityPct": 82,
+      "windSpeedMps": 5.3,
+      "windFromDeg": 194,
+      "precipitationMm": 0
+    },
+    "provenance": [
+      {
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=53.025&longitude=-6.3515&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=GMT&past_hours=2&forecast_hours=9",
+        "version": "forecast-hourly",
+        "retrievedAt": "2026-11-14T16:55:55.421Z",
+        "validAt": "2026-11-14T16:56:58.110Z",
+        "license": "CC BY 4.0; hosted non-commercial API",
+        "attribution": "Weather data by Open-Meteo.com",
+        "checksum": "35558badda88aede64e9ac7a1c771b56ba33a0ede0d61ed466c0d1226eeec433",
+        "sample": false,
+        "parameters": {
+          "latitude": 53.025,
+          "longitude": -6.3515,
+          "weatherMode": "current",
+          "dataKind": "forecast",
+          "windUnit": "m/s",
+          "windDirectionConvention": "meteorological direction from",
+          "precipitationInterval": "preceding hour",
+          "issueTimeMeaning": "retrieval availability; provider issue time unavailable",
+          "forecastEndSec": 25381.890000104904,
+          "coverageEndSec": 25381.890000104904,
+          "storage": "remote-persistent-cache",
+          "sourceCoordinate": {
+            "latitude": 53.019775,
+            "longitude": -6.3586884
+          }
+        }
+      }
+    ]
+  }
+}
