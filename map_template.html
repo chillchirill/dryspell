@@ -1,202 +1,249 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wildfire Outlook</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<title>Wildfire forecast</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root {
-  --bg:#0b0d12; --panel:rgba(17,20,28,.82); --line:rgba(255,255,255,.08); --fg:#f1f3f7; --muted:#8b93a7;
-  --chip:rgba(255,255,255,.06); --chip-on:rgba(255,255,255,.14); --accent:#ff7a1a; --shadow:0 10px 40px rgba(0,0,0,.45);
-}
-body.light {
-  --bg:#eef0f4; --panel:rgba(255,255,255,.86); --line:rgba(15,23,42,.09); --fg:#111827; --muted:#5b6475;
-  --chip:rgba(15,23,42,.05); --chip-on:rgba(15,23,42,.11); --shadow:0 10px 40px rgba(15,23,42,.18);
-}
+:root { --bg:#e9ebee; --panel:#ffffff; --line:#d9dce1; --fg:#1a1d21; --muted:#646b76; --hover:#f2f3f5; --hot:#d9480f; }
+body.dark { --bg:#0e1013; --panel:#191c20; --line:#30343b; --fg:#eceef1; --muted:#9aa1ac; --hover:#252930; --hot:#ff8a3d; }
 * { box-sizing:border-box; }
 html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
-  font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
 #map { position:absolute; inset:0; background:var(--bg); }
 
-.panel { position:absolute; z-index:1000; top:16px; left:16px; width:340px; max-height:calc(100% - 32px);
-  display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:18px;
-  box-shadow:var(--shadow); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
-  transition:background .25s; }
-.head { display:flex; gap:12px; align-items:center; padding:16px 16px 12px; }
-.logo { flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
-  background:linear-gradient(140deg,#ffcf3d,#ff6a00 55%,#c3141f); box-shadow:0 4px 18px rgba(255,106,0,.45); }
-.head h1 { margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
-.head .sub { color:var(--muted); font-size:12px; }
-.collapse { margin-left:auto; flex:none; width:30px; height:30px; border:0; border-radius:9px; cursor:pointer;
-  background:var(--chip); color:var(--fg); display:grid; place-items:center; }
-.collapse svg { transition:transform .2s; }
-.panel.closed .collapse svg { transform:rotate(180deg); }
+.cells-cv, .cells-glow { position:absolute; left:0; top:0; }
+.cells-glow { filter:blur(7px); mix-blend-mode:screen; animation:breathe 3.4s ease-in-out infinite; }
+body.noglow .cells-glow { display:none; }
+@keyframes breathe { 0%,100% { opacity:.25; } 50% { opacity:.6; } }
+.leaflet-cells-pane { transition:opacity 1.6s ease-out; }
+
+.panel { position:absolute; z-index:1000; top:12px; left:12px; width:300px; max-height:calc(100% - 24px);
+  display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,.12); accent-color:var(--fg); }
+.panel.right { left:auto; right:12px; width:270px; }
+.head { display:flex; align-items:flex-start; gap:8px; padding:14px 14px 12px; }
+.head h1 { margin:0; font-size:16px; font-weight:600; }
+.head .sub { color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; }
+.collapse { margin-left:auto; flex:none; width:26px; height:26px; border:1px solid var(--line); border-radius:6px;
+  cursor:pointer; background:none; color:var(--fg); font:inherit; line-height:1; }
+.collapse:hover { background:var(--hover); }
 .panel.closed .body { display:none; }
-.body { overflow-y:auto; padding:0 16px 16px; scrollbar-width:thin; }
+.body { overflow-y:auto; padding:0 14px 14px; scrollbar-width:thin; }
+.body > section { padding:12px 0; border-top:1px solid var(--line); }
+.body > section:last-child { padding-bottom:0; }
 
-.window { display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:12px; background:var(--chip);
-  font-size:12px; font-variant-numeric:tabular-nums; }
-.window .dot { width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.2); }
+h2 { margin:0 0 6px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+h2 span { font-weight:400; color:var(--muted); }
+.num { font-variant-numeric:tabular-nums; }
+.summary b { font-weight:600; }
+.hint { color:var(--muted); font-size:12.5px; }
 
-.stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
-.stat { padding:10px 12px; border-radius:12px; background:var(--chip); }
-.stat b { display:block; font-size:19px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
-.stat span { color:var(--muted); font-size:11px; }
+input[type=range] { width:100%; margin:4px 0 0; cursor:pointer; }
+.ticks { display:flex; justify-content:space-between; color:var(--muted); font-size:11.5px; font-variant-numeric:tabular-nums; }
 
-.sec { margin-top:16px; }
-.sec-title { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;
-  font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-.badge { font-size:13px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--fg);
-  padding:2px 9px; border-radius:999px; background:var(--chip-on); font-variant-numeric:tabular-nums; }
-
-input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:999px; margin:6px 0;
-  outline:none; cursor:pointer; background:var(--chip-on); }
-input[type=range].heat { background:linear-gradient(90deg,#fde68a,#fbbf24 30%,#f97316 55%,#dc2626 78%,#7f1d1d); }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
-  background:#fff; border:3px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.35); }
-input[type=range]::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#fff;
-  border:3px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.35); }
-input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 4px rgba(255,122,26,.35); }
-.ticks { display:flex; justify-content:space-between; color:var(--muted); font-size:10.5px; font-variant-numeric:tabular-nums; }
-
-.seg { display:flex; padding:3px; border-radius:11px; background:var(--chip); gap:2px; }
-.seg button { flex:1; border:0; background:none; color:var(--muted); font:inherit; font-weight:500; padding:6px 4px;
-  border-radius:8px; cursor:pointer; transition:background .15s,color .15s; }
-.seg button:hover { color:var(--fg); }
-.seg button.on { background:var(--chip-on); color:var(--fg); box-shadow:0 1px 3px rgba(0,0,0,.15); }
-
-.row { display:flex; align-items:center; gap:10px; margin-top:10px; }
-.row label { flex:none; width:64px; color:var(--muted); font-size:12px; }
-.toggles { display:grid; gap:2px; margin-top:8px; }
-.toggle { display:flex; align-items:center; gap:10px; padding:7px 4px; cursor:pointer; user-select:none; }
-.toggle input { display:none; }
-.switch { flex:none; width:30px; height:18px; border-radius:999px; background:var(--chip-on); position:relative; transition:background .2s; }
-.switch::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
-  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .2s; }
-.toggle input:checked + .switch { background:var(--accent); }
-.toggle input:checked + .switch::after { transform:translateX(12px); }
-.toggle small { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
-
-.legend-classes { display:grid; gap:4px; }
-.lg { display:flex; align-items:center; gap:9px; font-size:12px; }
-.lg i { width:12px; height:12px; border-radius:4px; flex:none; }
+.rows { display:grid; gap:3px; }
+.lg { display:flex; align-items:center; gap:8px; }
+.lg i { width:12px; height:12px; border-radius:2px; flex:none; }
 .lg em { font-style:normal; color:var(--muted); }
-.lg small { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
-.bar { height:10px; border-radius:999px; background:linear-gradient(90deg,#fde68a,#fbbf24 30%,#f97316 55%,#dc2626 78%,#7f1d1d); }
-.note { color:var(--muted); font-size:11.5px; margin-top:8px; }
-.note span { display:inline-block; width:10px; height:10px; border:1.5px solid var(--fg); border-radius:2px; vertical-align:-1px; margin-right:4px; }
-.note b { display:inline-block; width:6px; height:6px; border-radius:50%; background:#22d3ee; vertical-align:1px; margin:0 4px 0 8px; }
+.lg small, .check small, .country small { margin-left:auto; color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; }
+.bar { height:10px; border-radius:2px; margin-bottom:4px; }
 
-.countries { display:grid; gap:2px; }
-.country { display:grid; grid-template-columns:1fr auto; gap:2px 10px; padding:7px 8px; border-radius:9px;
-  cursor:pointer; border:0; background:none; color:inherit; font:inherit; text-align:left; }
-.country:hover { background:var(--chip); }
-.country .meter { grid-column:1/-1; height:3px; border-radius:2px; background:var(--chip-on); overflow:hidden; }
-.country .meter div { height:100%; border-radius:2px; background:linear-gradient(90deg,#fbbf24,#ef4444); }
-.country small { color:var(--muted); font-variant-numeric:tabular-nums; }
+.check { display:flex; align-items:center; gap:8px; padding:3px 0; cursor:pointer; }
+.check input { margin:0; width:15px; height:15px; flex:none; }
+.check + .hint { margin:0 0 6px 23px; }
+.key { display:inline-block; width:11px; height:11px; border:1.5px solid var(--fg); vertical-align:-1px; }
 
-details { margin-top:16px; border-top:1px solid var(--line); padding-top:12px; }
-summary { cursor:pointer; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
-details table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
-details td { padding:3px 0; } details td:last-child { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
-details td:first-child { color:var(--muted); }
+.country { display:flex; padding:3px 6px; margin:0 -6px; width:calc(100% + 12px); border:0; border-radius:4px;
+  background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.country:hover { background:var(--hover); }
+
+details summary { cursor:pointer; font-size:13px; font-weight:600; }
+details > div, details > table { margin-top:8px; }
+.field { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.field > span { flex:none; width:84px; color:var(--muted); font-size:13px; }
+select { flex:1; font:inherit; color:var(--fg); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:3px 6px; }
+table { width:100%; border-collapse:collapse; font-size:12.5px; }
+td { padding:2px 0; vertical-align:top; } td:first-child { color:var(--muted); padding-right:10px; }
+td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* time bar */
+.timebar { position:absolute; z-index:1000; left:336px; right:70px; bottom:22px; pointer-events:none; }
+.tb { pointer-events:auto; max-width:640px; margin:0 auto; display:flex; gap:14px; align-items:center; padding:12px 16px 12px 12px;
+  background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.18); accent-color:var(--hot); }
+.playbtn { flex:none; width:44px; height:44px; border-radius:50%; border:0; cursor:pointer; background:var(--fg); color:var(--panel);
+  display:grid; place-items:center; }
+.playbtn:hover { opacity:.85; }
+.tb-main { flex:1; min-width:0; }
+.tb-top { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.tb-date { font-size:20px; font-weight:600; letter-spacing:-.01em; }
+.tb-sub { color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; }
+.tb-exp { margin-left:auto; font-size:13px; font-variant-numeric:tabular-nums; }
+.tb-exp b { color:var(--hot); font-weight:600; }
+.days { display:flex; justify-content:space-between; margin-top:2px; }
+.days button { border:0; background:none; font:inherit; font-size:12px; color:var(--muted); cursor:pointer; padding:2px 4px; border-radius:4px; }
+.days button:hover { background:var(--hover); }
+.days button.on { color:var(--fg); font-weight:600; }
+#time { margin:0; }
+
+.form { display:grid; gap:6px; }
+.form input[type=text], .form select { width:100%; font:inherit; color:var(--fg); background:var(--panel);
+  border:1px solid var(--line); border-radius:6px; padding:5px 8px; }
+.btn { font:inherit; color:var(--fg); background:none; border:1px solid var(--line); border-radius:6px; padding:5px 10px; cursor:pointer; }
+.btn:hover { background:var(--hover); }
+.btn.primary { background:var(--fg); color:var(--panel); border-color:var(--fg); }
+.btn:disabled { opacity:.45; cursor:default; }
+.btn.picking { border-color:var(--fg); }
+.device { display:flex; align-items:center; gap:8px; padding:3px 0; }
+.device i { width:10px; height:10px; flex:none; background:#2563eb; border:1.5px solid #fff; outline:1px solid #2563eb; }
+.device div { min-width:0; flex:1; cursor:pointer; }
+.device small { display:block; color:var(--muted); font-size:12px; }
+.device button { border:0; background:none; color:var(--muted); font:inherit; cursor:pointer; padding:2px 6px; border-radius:4px; }
+.device button:hover { background:var(--hover); color:var(--fg); }
+body.picking .leaflet-container { cursor:crosshair; }
+.leaflet-container.over-cell { cursor:pointer; }
 
 /* Leaflet chrome */
-.leaflet-control-zoom a { background:var(--panel)!important; color:var(--fg)!important; border-color:var(--line)!important;
-  backdrop-filter:blur(12px); }
-.leaflet-bar { border:1px solid var(--line)!important; border-radius:12px!important; overflow:hidden; box-shadow:var(--shadow)!important; }
-.leaflet-control-attribution { background:var(--panel)!important; color:var(--muted)!important; border-radius:8px 0 0 0; }
+.leaflet-container { font:inherit; background:var(--bg); }
+.leaflet-bar { border:1px solid var(--line)!important; border-radius:6px!important; box-shadow:0 1px 4px rgba(0,0,0,.12)!important; }
+.leaflet-control-zoom a { background:var(--panel)!important; color:var(--fg)!important; border-color:var(--line)!important; }
+.leaflet-control-attribution { background:var(--panel)!important; color:var(--muted)!important; }
 .leaflet-control-attribution a { color:var(--muted)!important; }
-.leaflet-popup-content-wrapper { background:var(--panel); color:var(--fg); border-radius:16px; border:1px solid var(--line);
-  box-shadow:var(--shadow); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+.leaflet-popup-content-wrapper { background:var(--panel); color:var(--fg); border-radius:8px; border:1px solid var(--line);
+  box-shadow:0 2px 10px rgba(0,0,0,.25); }
 .leaflet-popup-tip { background:var(--panel); }
-.leaflet-popup-content { margin:14px 16px; font:13px/1.45 Inter,system-ui,sans-serif; min-width:220px; }
+.leaflet-popup-content { margin:12px 14px; font-size:13px; line-height:1.45; min-width:220px; }
 .leaflet-container a.leaflet-popup-close-button { color:var(--muted); }
-.pop-top { display:flex; align-items:baseline; gap:8px; }
-.pop-top b { font-size:26px; font-weight:700; letter-spacing:-.03em; }
-.pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; color:#111; }
-.pop-place { color:var(--muted); font-size:12px; margin:2px 0 8px; }
-.pop-bar { height:5px; border-radius:999px; background:var(--chip-on); overflow:hidden; margin-bottom:10px; }
-.pop-bar div { height:100%; border-radius:999px; }
-.pop-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-.pop-grid div { background:var(--chip); border-radius:9px; padding:6px 8px; }
-.pop-grid span { display:block; color:var(--muted); font-size:10.5px; }
-.pop-grid strong { font-variant-numeric:tabular-nums; }
-.pop-flag { margin-top:8px; padding:6px 8px; border-radius:9px; font-size:12px; background:rgba(255,122,26,.14); color:var(--accent); }
+.pop-p { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+.pop-cls { display:flex; align-items:center; gap:6px; }
+.pop-cls i { width:10px; height:10px; border-radius:2px; }
+.pop-place { color:var(--muted); margin:2px 0 8px; }
+.pop-days { display:flex; gap:6px; align-items:flex-end; margin:0 0 10px; padding:8px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.pop-days div { flex:1; text-align:center; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pop-days i { display:block; margin:3px auto; width:70%; border-radius:2px 2px 0 0; }
+.pop-days div.on { color:var(--fg); font-weight:600; }
+.pop-new { margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
 
 @media (max-width:640px) {
-  .panel { top:auto; bottom:10px; left:10px; right:10px; width:auto; max-height:58vh; }
-  .leaflet-bottom.leaflet-right { bottom:auto; top:0; }
+  .panel { top:auto; bottom:8px; left:8px; right:8px; width:auto; max-height:55vh; }
+  .panel.right { top:118px; bottom:auto; left:8px; right:8px; width:auto; max-height:45vh; }
+  .head { padding:10px 12px; }
+  .timebar { left:8px; right:8px; top:8px; bottom:auto; }
+  .tb { padding:8px 12px 8px 8px; gap:10px; }
+  .playbtn { width:38px; height:38px; }
+  .tb-date { font-size:17px; }
+  .tb-sub { display:none; }
+  .leaflet-control-zoom { display:none; }
+  .leaflet-bottom.leaflet-right { bottom:72px; }
+  .leaflet-control-attribution { font-size:9px; }
 }
+@media (prefers-reduced-motion:reduce) { .cells-glow { animation:none; } .leaflet-cells-pane { transition:none; } }
 </style></head>
-<body>
+<body class="dark">
 <div id="map"></div>
 
 <aside class="panel" id="panel">
   <div class="head">
-    <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 2c.6 3.2-1 5.2-2.6 7C7.8 10.8 6 12.8 6 15.5A6 6 0 0 0 12 22a6 6 0 0 0 6-6.3c0-2.5-1.3-4.3-2.4-5.6-.2 1.6-.9 2.8-2.1 3.4.5-3.6-.3-8.6-1.5-11.5Z"/></svg></div>
-    <div><h1>Wildfire outlook</h1><div class="sub">Next 24 h &middot; NASA FIRMS + NOAA GFS</div></div>
-    <button class="collapse" id="collapse" aria-label="Collapse panel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></button>
+    <div><h1>Wildfire forecast</h1><div class="sub" id="valid"></div></div>
+    <button class="collapse" id="collapse" aria-label="Hide or show the panel">&minus;</button>
   </div>
   <div class="body">
-    <div class="window"><span class="dot"></span><span id="valid"></span></div>
+    <section class="summary">
+      <div><b class="num" id="sExp">–</b> squares expected to burn</div>
+      <div class="hint"><span class="num" id="sCells">–</span> squares shown, each about <span id="km"></span> km wide</div>
+    </section>
 
-    <div class="stats">
-      <div class="stat"><b id="sCells">–</b><span>cells shown</span></div>
-      <div class="stat"><b id="sExp">–</b><span>expected to burn</span></div>
-    </div>
-
-    <div class="sec">
-      <div class="sec-title"><span>Min. probability</span><span class="badge" id="thrVal">1%</span></div>
-      <input type="range" id="thr" class="heat" min="0" max="15" step="1" value="0" aria-label="Minimum fire probability">
+    <section>
+      <h2>Show probability from <span class="num" id="thrVal">1%</span></h2>
+      <input type="range" id="thr" min="0" max="15" step="1" value="0" aria-label="Minimum fire probability">
       <div class="ticks"><span>1%</span><span>10%</span><span>40%</span><span>90%</span></div>
-    </div>
+    </section>
 
-    <div class="sec">
-      <div class="sec-title"><span>Display</span></div>
-      <div class="seg" id="mode">
-        <button data-v="classes">Risk classes</button><button data-v="gradient">Gradient</button>
-      </div>
-      <div class="row"><label for="op">Opacity</label><input type="range" id="op" min="15" max="100" value="75"></div>
-      <div class="row"><label>Basemap</label>
-        <div class="seg" id="base" style="flex:1"><button data-v="dark">Dark</button><button data-v="light">Light</button><button data-v="satellite">Satellite</button></div>
-      </div>
-      <div class="toggles">
-        <label class="toggle"><input type="checkbox" id="fresh"><span class="switch"></span>New ignitions only<small id="nFresh"></small></label>
-        <label class="toggle"><input type="checkbox" id="dets"><span class="switch"></span>Detections, last 24 h<small id="nDets"></small></label>
-        <label class="toggle"><input type="checkbox" id="borders" checked><span class="switch"></span>Country borders</label>
-      </div>
-    </div>
-
-    <div class="sec">
-      <div class="sec-title"><span>Legend</span></div>
+    <section>
+      <h2>Chance of fire <span>squares</span></h2>
       <div id="legend"></div>
-      <div class="note"><span></span>new-ignition risk (no fire within ~1&deg; this week)<b></b>detection</div>
-    </div>
+    </section>
 
-    <div class="sec">
-      <div class="sec-title"><span>Top countries</span><span style="text-transform:none;letter-spacing:0">expected cells</span></div>
-      <div class="countries" id="countries"></div>
-    </div>
+    <section>
+      <label class="check"><input type="checkbox" id="fresh">Only new fire areas<small id="nFresh"></small></label>
+      <div class="hint"><span class="key"></span> No fire within ~100 km for 7 days</div>
+      <label class="check"><input type="checkbox" id="dets">Fires seen by satellite, last 24 h<small id="nDets"></small></label>
+    </section>
 
-    <details>
-      <summary>Model &amp; data</summary>
-      <table id="meta"></table>
-    </details>
+    <section>
+      <h2>Top countries <span>expected squares</span></h2>
+      <div id="countries"></div>
+    </section>
+
+    <section>
+      <details>
+        <summary>Map settings</summary>
+        <div>
+          <label class="field"><span>Background</span>
+            <select id="base"><option value="dark">Dark</option><option value="light">Light</option><option value="satellite">Satellite</option></select></label>
+          <label class="field"><span>Opacity</span><input type="range" id="op" min="15" max="100" value="90"></label>
+          <label class="check"><input type="checkbox" id="classes">Colour by risk class</label>
+          <label class="check"><input type="checkbox" id="glow" checked>Glow on high-risk areas</label>
+          <label class="check"><input type="checkbox" id="borders" checked>Country borders</label>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <details>
+        <summary>Model and data</summary>
+        <table id="meta"></table>
+      </details>
+    </section>
   </div>
 </aside>
 
+<aside class="panel right" id="iot">
+  <div class="head">
+    <div><h1>Ground sensors</h1><div class="sub" id="iotCount"></div></div>
+    <button class="collapse" id="iotCollapse" aria-label="Hide or show the sensor panel">&minus;</button>
+  </div>
+  <div class="body">
+    <section>
+      <div class="hint">Preview. Sensors are saved in this browser only and do not send data yet.</div>
+    </section>
+    <section>
+      <h2>Add a sensor</h2>
+      <div class="form">
+        <input type="text" id="iotName" placeholder="Name, e.g. North ridge" maxlength="40" aria-label="Sensor name">
+        <select id="iotType" aria-label="Sensor type">
+          <option>Temperature and humidity</option><option>Smoke</option><option>Camera</option><option>Weather station</option>
+        </select>
+        <button class="btn" id="iotPick">Choose place on the map</button>
+        <div class="hint" id="iotPlace">No place chosen</div>
+        <button class="btn primary" id="iotAdd" disabled>Add sensor</button>
+      </div>
+    </section>
+    <section>
+      <h2>Your sensors</h2>
+      <div id="iotList"></div>
+    </section>
+  </div>
+</aside>
+
+<div class="timebar" id="timebar"><div class="tb">
+  <button class="playbtn" id="play" aria-label="Play or pause the forecast"></button>
+  <div class="tb-main">
+    <div class="tb-top"><span class="tb-date" id="tbDate"></span><span class="tb-sub" id="tbSub"></span><span class="tb-exp"><b id="tbExp"></b> burning</span></div>
+    <input type="range" id="time" min="0" max="100" value="0" aria-label="Forecast day">
+    <div class="days" id="days"></div>
+  </div>
+</div></div>
+
 <script>
-const C = __CELLS__;
+const D = __DATA__;
 const P = __PTS__;
 const B = __BORDERS__;
 const META = __META__;
 const RISK = __COLORS__;
 const RES = __RES__, H = RES / 2;
 const STEPS = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90];
-const CLASS_RANGE = {"Low": "< 10%", "Moderate": "10–30%", "High": "30–60%", "Very high": "≥ 60%"};
+const CLASSES = [["Low", "under 10%", 0], ["Moderate", "10–30%", .1], ["High", "30–60%", .3], ["Very high", "over 60%", .6]];
 const BASES = {
   dark: ['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
          'Tiles &copy; Esri', 'dark'],
@@ -208,183 +255,396 @@ const BASES = {
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString('en-US');
 const pct = p => (p * 100 >= 10 ? (p * 100).toFixed(0) : (p * 100).toFixed(1)) + '%';
+const phone = matchMedia('(max-width:640px)');
+const calm = matchMedia('(prefers-reduced-motion:reduce)').matches;
 
 // ---- state (remembered per browser) -------------------------------------------------
-const state = {step: 0, mode: 'classes', opacity: 75, base: 'dark', fresh: false, dets: false, borders: true,
-               open: !matchMedia('(max-width:640px)').matches};
-try { Object.assign(state, JSON.parse(localStorage.getItem('wildfireMap') || '{}')); } catch (e) {}
-const save = () => { try { localStorage.setItem('wildfireMap', JSON.stringify(state)); } catch (e) {} };
+const state = {step: 0, mode: 'gradient', opacity: 90, base: 'dark', fresh: false, dets: false, borders: true,
+               glow: !phone.matches, autoplay: true, open: !phone.matches, iotOpen: false};
+try { Object.assign(state, JSON.parse(localStorage.getItem('wildfireMap3') || '{}')); } catch (e) {}
+if (!BASES[state.base]) state.base = 'dark';
+const save = () => { try { localStorage.setItem('wildfireMap3', JSON.stringify(state)); } catch (e) {} };
+const theme = () => BASES[state.base][2];
 
-// ---- colour ramp (log scale, 1% .. 100%) --------------------------------------------
-const STOPS = [[0, [253, 230, 138]], [.3, [251, 191, 36]], [.55, [249, 115, 22]], [.78, [220, 38, 38]], [1, [127, 29, 29]]];
-function ramp(p) {
-  const t = Math.max(0, Math.min(1, Math.log(p / 0.01) / Math.log(100)));
-  for (let i = 1; i < STOPS.length; i++) if (t <= STOPS[i][0]) {
-    const [t0, a] = STOPS[i - 1], [t1, b] = STOPS[i], f = (t - t0) / (t1 - t0);
-    return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')})`;
-  }
-  return 'rgb(127,29,29)';
+// ---- data: columns -> typed arrays ---------------------------------------------------
+const N = D.lat.length, K = D.p.length, NX = Math.round(360 / RES), NY = Math.round(180 / RES);
+const CI = new Int32Array(N), CJ = new Int32Array(N), FR = Uint8Array.from(D.fresh), CT = Int32Array.from(D.cty);
+const PK = D.p.map(a => Float32Array.from(a, v => v / 1000));
+const lookup = new Map();
+for (let i = 0; i < N; i++) {
+  CI[i] = Math.floor((D.lat[i] + 90) / RES); CJ[i] = Math.floor((D.lon[i] + 180) / RES);
+  lookup.set(CI[i] * NX + CJ[i], i);
 }
+const merc = lat => { const s = Math.max(-85.05, Math.min(85.05, lat)) * Math.PI / 180;
+  return 0.5 - Math.log(Math.tan(Math.PI / 4 + s / 2)) / (2 * Math.PI); };
+const ROWF = Float64Array.from({length: NY + 1}, (_, i) => merc(-90 + i * RES));   // world fraction of each row edge
+const PX = Float64Array.from(P, p => (p[1] + 180) / 360), PY = Float64Array.from(P, p => merc(p[0]));
+const days = META.days.map(d => ({from: new Date(d.from), to: new Date(d.to)}));
+const dfmt = (d, o) => d.toLocaleDateString('en-GB', {timeZone: 'UTC', ...o});
+days.forEach(d => {
+  const mid = new Date((+d.from + +d.to) / 2);
+  d.chip = dfmt(mid, {weekday: 'short', day: 'numeric'});
+  d.title = dfmt(mid, {weekday: 'long', day: 'numeric', month: 'short'});
+  const hm = x => x.toISOString().slice(11, 16);
+  d.span = `${dfmt(d.from, {day: 'numeric', month: 'short'})} ${hm(d.from)} → ${dfmt(d.to, {day: 'numeric', month: 'short'})} ${hm(d.to)} UTC`;
+});
 
-// ---- data --------------------------------------------------------------------------
-const cells = C.map((r, i) => ({i, lat: r[0], lon: r[1], p: r[2], cls: r[3], country: r[4], det: r[5], fresh: !!r[6],
-  tmax: r[7], rh: r[8], wind: r[9], rain7: r[10], dsr: r[11], grad: ramp(r[2]), rect: null, on: false}))
-  .sort((a, b) => b.p - a.p);
+// ---- time ---------------------------------------------------------------------------
+let t = 0, playing = false, hold = 0, target = Math.min(1, K - 1), goto = null, dirty = true, shownDay = -1;
+const dayNow = () => Math.max(0, Math.min(K - 1, Math.round(t)));
+let TA = 0, TF = 0;                       // interpolation: day index and fraction
+const setInterp = () => { TA = Math.min(Math.max(0, K - 2), Math.floor(t)); TF = K > 1 ? t - TA : 0; };
+const pAt = i => K > 1 ? PK[TA][i] + (PK[TA + 1][i] - PK[TA][i]) * TF : PK[0][i];
 
-// ---- map ---------------------------------------------------------------------------
-const map = L.map('map', {preferCanvas: true, worldCopyJump: true, zoomControl: false, minZoom: 2}).setView([18, 12], 3);
+// ---- colours ------------------------------------------------------------------------
+const NB = 40, LOG100 = Math.log(100);
+const RAMP = {
+  dark: [[0, [104, 24, 22]], [.35, [190, 44, 28]], [.62, [238, 104, 22]], [.86, [252, 176, 48]], [1, [255, 232, 150]]],
+  light: [[0, [253, 226, 130]], [.3, [251, 178, 40]], [.55, [240, 104, 22]], [.78, [205, 32, 36]], [1, [112, 20, 24]]],
+};
+function rampRgb(u, th) {
+  const st = RAMP[th];
+  for (let i = 1; i < st.length; i++) if (u <= st[i][0]) {
+    const [u0, a] = st[i - 1], [u1, b] = st[i], f = (u - u0) / (u1 - u0);
+    return a.map((v, k) => Math.round(v + (b[k] - v) * f));
+  }
+  return st[st.length - 1][1];
+}
+const hexRgb = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+let FILL = [], SOLID = [], GLOW_FROM = 0;
+function buildColours() {
+  const th = theme();
+  if (state.mode === 'classes') {
+    SOLID = CLASSES.map(c => hexRgb(RISK[c[0]]));
+    FILL = SOLID.map(c => `rgb(${c})`);
+    GLOW_FROM = 2;
+  } else {
+    SOLID = Array.from({length: NB}, (_, b) => rampRgb((b + .5) / NB, th));
+    FILL = SOLID.map((c, b) => `rgba(${c},${(th === 'dark' ? .5 : .78) + (th === 'dark' ? .5 : .22) * (b + .5) / NB})`);
+    GLOW_FROM = Math.floor(NB * Math.log(30) / LOG100);
+  }
+}
+const bucketOf = p => state.mode === 'classes' ? (p >= .6 ? 3 : p >= .3 ? 2 : p >= .1 ? 1 : 0)
+  : Math.max(0, Math.min(NB - 1, Math.floor(NB * Math.log(p * 100) / LOG100)));
+const colourOf = p => `rgb(${SOLID[bucketOf(Math.max(p, .01))]})`;
+
+// ---- map ----------------------------------------------------------------------------
+const map = L.map('map', {worldCopyJump: true, zoomControl: false, minZoom: 2, zoomAnimation: false, markerZoomAnimation: false})
+  .setView(phone.matches ? [8, 20] : [14, 18], phone.matches ? 2 : 3);
 L.control.zoom({position: 'bottomright'}).addTo(map);
-const renderer = L.canvas({padding: 0.4, tolerance: 2});
-// Cells get their own pane: they are drawn opaque and slightly overlapping, and the pane as a whole is
-// made translucent, so there are no hairline seams between neighbouring cells at any zoom or DPI.
-map.createPane('cells').style.zIndex = 390;
-const cellRenderer = L.canvas({padding: 0.4, tolerance: 1, pane: 'cells'});
 const credit = ' | Fire data: NASA FIRMS | Weather: NOAA GFS';
 let baseLayer = null;
-const borderLine = L.polyline(B, {weight: 0.7, interactive: false, renderer});
-const cellGroup = L.featureGroup().addTo(map);
-const detGroup = L.featureGroup();
-P.forEach(p => L.circleMarker([p[0], p[1]], {renderer, radius: 2, weight: 0, fillOpacity: .85, frp: p[2]}).addTo(detGroup));
-
-const theme = () => BASES[state.base][2];
+const borderLine = L.polyline(B, {weight: 0.7, interactive: false, renderer: L.canvas({padding: 0.4})});
+const pane = map.createPane('cells'); pane.style.zIndex = 390; pane.style.pointerEvents = 'none'; pane.style.opacity = 0;
+const cv = L.DomUtil.create('canvas', 'cells-cv', pane), gl = L.DomUtil.create('canvas', 'cells-glow', pane);
+const ctx = cv.getContext('2d'), gtx = gl.getContext('2d');
+map.createPane('hl').style.zIndex = 395;
+const hl = L.rectangle([[0, 0], [0, 0]], {pane: 'hl', interactive: false, fill: false, weight: 2});
 const outline = () => theme() === 'dark' ? '#ffffff' : '#111827';
+const eligibleP = (i, p) => p >= STEPS[state.step] / 100 && (!state.fresh || FR[i]);
 
-function styleOf(c) {
-  return {
-    fillColor: state.mode === 'classes' ? RISK[c.cls] : c.grad, fillOpacity: 1,
-    stroke: c.fresh, color: outline(), weight: 1, opacity: 0.9,
-  };
-}
-// Push cell corners outwards to whole pixels: neighbours overlap by < 1 px instead of leaving a gap.
-const Cell = L.Rectangle.extend({
-  _project() {
-    L.Rectangle.prototype._project.call(this);
-    for (const ring of this._rings) {
-      const xs = ring.map(p => p.x), ys = ring.map(p => p.y);
-      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-      for (const p of ring) { p.x = p.x < cx ? Math.floor(p.x) : Math.ceil(p.x); p.y = p.y < cy ? Math.floor(p.y) : Math.ceil(p.y); }
+const BK = new Uint8Array(N), X0 = new Int32Array(N), Y0 = new Int32Array(N), WW = new Int32Array(N), HH = new Int32Array(N);
+const colX = new Int32Array(NX + 1), rowY = new Int32Array(NY + 1);
+const CNT = new Int32Array(NB + 2), POS = new Int32Array(NB + 2), ORD = new Int32Array(N);
+function draw() {
+  const size = map.getSize(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = Math.round(size.x * dpr), Hh = Math.round(size.y * dpr);
+  for (const c of [cv, gl]) {
+    if (c.width !== W || c.height !== Hh) { c.width = W; c.height = Hh; c.style.width = size.x + 'px'; c.style.height = size.y + 'px'; }
+    L.DomUtil.setPosition(c, map.containerPointToLayerPoint([0, 0]));
+  }
+  ctx.clearRect(0, 0, W, Hh); gtx.clearRect(0, 0, W, Hh);
+  const S = 256 * Math.pow(2, map.getZoom()), org = map.getPixelBounds().min;
+  const glowOn = state.glow && theme() === 'dark';
+  setInterp();
+  for (let i = 0; i <= NY; i++) rowY[i] = Math.round((ROWF[i] * S - org.y) * dpr);
+  for (let shift = -1; shift <= 1; shift++) {
+    const left = (shift * S - org.x) * dpr;
+    if (left > W || left + S * dpr < 0) continue;
+    for (let j = 0; j <= NX; j++) colX[j] = Math.round(left + j / NX * S * dpr);
+    const cellPx = colX[1] - colX[0];
+    for (let i = 0; i < N; i++) {
+      BK[i] = 255;
+      const p = pAt(i);
+      if (!eligibleP(i, p)) continue;
+      const x0 = colX[CJ[i]], x1 = colX[CJ[i] + 1], y0 = rowY[CI[i] + 1], y1 = rowY[CI[i]];
+      if (x1 < 0 || x0 > W || y1 < 0 || y0 > Hh) continue;
+      X0[i] = x0; Y0[i] = y0; WW[i] = Math.max(1, x1 - x0); HH[i] = Math.max(1, y1 - y0);
+      BK[i] = bucketOf(p);
     }
-  },
-});
-const applyOpacity = () => { map.getPane('cells').style.opacity = state.opacity / 100; };
-function rectOf(c) {
-  if (!c.rect) c.rect = new Cell([[c.lat - H, c.lon - H], [c.lat + H, c.lon + H]], {renderer: cellRenderer, i: c.i, ...styleOf(c)});
-  return c.rect;
-}
-const eligible = c => c.p >= STEPS[state.step] / 100 && (!state.fresh || c.fresh);
-
-// Add/remove only the cells whose visibility changed; restyle visible ones when asked.
-function sync(restyle) {
-  for (const c of cells) {
-    const want = eligible(c);
-    if (want && !c.on) { rectOf(c).setStyle(styleOf(c)); cellGroup.addLayer(c.rect); c.on = true; }
-    else if (!want && c.on) { cellGroup.removeLayer(c.rect); c.on = false; }
-    else if (want && restyle) c.rect.setStyle(styleOf(c));
+    // counting sort by colour bucket, then one path per colour
+    const nb = FILL.length;
+    CNT.fill(0);
+    for (let i = 0; i < N; i++) if (BK[i] !== 255) CNT[BK[i] + 1]++;
+    for (let b = 0; b < nb; b++) CNT[b + 1] += CNT[b];
+    POS.set(CNT);
+    for (let i = 0; i < N; i++) if (BK[i] !== 255) ORD[POS[BK[i]]++] = i;
+    for (let b = 0; b < nb; b++) {
+      if (CNT[b + 1] === CNT[b]) continue;
+      ctx.beginPath();
+      const g = glowOn && b >= GLOW_FROM;
+      if (g) gtx.beginPath();
+      for (let q = CNT[b]; q < CNT[b + 1]; q++) {
+        const i = ORD[q];
+        ctx.rect(X0[i], Y0[i], WW[i], HH[i]);
+        if (g) gtx.rect(X0[i], Y0[i], WW[i], HH[i]);
+      }
+      ctx.fillStyle = FILL[b]; ctx.fill();
+      if (g) { gtx.fillStyle = `rgb(${SOLID[b]})`; gtx.fill(); }
+    }
+    if (cellPx >= 5 * dpr) {          // outline new fire areas once squares are large enough to see it
+      ctx.beginPath();
+      for (let i = 0; i < N; i++) if (BK[i] !== 255 && FR[i]) ctx.rect(X0[i] + .5, Y0[i] + .5, WW[i] - 1, HH[i] - 1);
+      ctx.strokeStyle = outline(); ctx.lineWidth = Math.max(1, dpr); ctx.stroke();
+    }
+    if (state.dets) {
+      const r = Math.max(1, Math.round(Math.min(4, cellPx / 6) * dpr)), fade = Math.max(.25, 1 - t);
+      ctx.fillStyle = theme() === 'dark' ? `rgba(34,211,238,${fade})` : `rgba(14,116,144,${fade})`;
+      ctx.beginPath();
+      for (let k = 0; k < PX.length; k++) {
+        const x = left + PX[k] * S * dpr, y = (PY[k] * S - org.y) * dpr;
+        if (x > -r && x < W + r && y > -r && y < Hh + r) ctx.rect(Math.round(x) - r, Math.round(y) - r, 2 * r, 2 * r);
+      }
+      ctx.fill();
+    }
   }
-  updateStats();
 }
 
-// ---- side panel --------------------------------------------------------------------
-function updateStats() {
+// ---- side panel ---------------------------------------------------------------------
+const nC = D.countries.length, cE = new Float64Array(nC), cN = new Int32Array(nC);
+let topCountries = [];
+function stats(full) {
   let n = 0, exp = 0;
-  const byCls = {}, byCountry = new Map();
-  for (const c of cells) if (c.on) {
-    n++; exp += c.p; byCls[c.cls] = (byCls[c.cls] || 0) + 1;
-    let k = byCountry.get(c.country);
-    if (!k) byCountry.set(c.country, k = {e: 0, n: 0, s: 90, w: 180, nn: -90, ee: -180});
-    k.e += c.p; k.n++; k.s = Math.min(k.s, c.lat); k.nn = Math.max(k.nn, c.lat); k.w = Math.min(k.w, c.lon); k.ee = Math.max(k.ee, c.lon);
+  const cls = [0, 0, 0, 0];
+  cE.fill(0); cN.fill(0);
+  for (let i = 0; i < N; i++) {
+    const p = pAt(i);
+    if (!eligibleP(i, p)) continue;
+    n++; exp += p; cls[p >= .6 ? 3 : p >= .3 ? 2 : p >= .1 ? 1 : 0]++; cE[CT[i]] += p; cN[CT[i]]++;
   }
+  $('sExp').textContent = 'About ' + fmt(exp);
+  $('tbExp').textContent = '≈ ' + fmt(exp);
   $('sCells').textContent = fmt(n);
-  $('sExp').textContent = fmt(exp);
-  $('thrVal').textContent = '≥ ' + STEPS[state.step] + '%';
-  renderLegend(byCls);
-  const top = [...byCountry].filter(([k]) => k && k !== 'Ocean / unassigned').sort((a, b) => b[1].e - a[1].e).slice(0, 7);
-  const max = top.length ? top[0][1].e : 1;
-  $('countries').innerHTML = top.map(([name, k], j) =>
-    `<button class="country" data-j="${j}"><span>${name}</span><small>${fmt(k.e)} &middot; ${fmt(k.n)} cells</small>` +
-    `<span class="meter"><div style="width:${(100 * k.e / max).toFixed(1)}%"></div></span></button>`).join('') ||
-    '<div class="note">No cells above this threshold.</div>';
+  if (!full) return;
+  $('thrVal').textContent = STEPS[state.step] + '%';
+  const bar = state.mode === 'classes' ? '' :
+    `<div class="bar" style="background:linear-gradient(90deg,${RAMP[theme()].map(([u, c]) => `rgb(${c}) ${u * 100}%`).join(',')})"></div>` +
+    '<div class="ticks" style="margin-bottom:8px"><span>1%</span><span>3%</span><span>10%</span><span>30%</span><span>100%</span></div>';
+  $('legend').innerHTML = bar + '<div class="rows">' + CLASSES.slice().reverse().map(([name, range, lo], k) =>
+    `<div class="lg"><i style="background:${state.mode === 'classes' ? RISK[name] : colourOf(Math.max(lo * 1.6, .03))}"></i>${name} <em>${range}</em><small>${fmt(cls[3 - k])}</small></div>`
+  ).join('') + '</div>';
+  topCountries = [...cE.keys()].filter(k => cN[k] && D.countries[k] !== 'Ocean / unassigned' && D.countries[k] !== 'Unassigned')
+    .sort((a, b) => cE[b] - cE[a]).slice(0, 7);
+  $('countries').innerHTML = topCountries.map(k =>
+    `<button class="country" data-k="${k}" title="Zoom to ${D.countries[k]}">${D.countries[k]}<small>${fmt(cE[k])}</small></button>`).join('') ||
+    '<div class="hint">No squares above this probability.</div>';
   $('countries').querySelectorAll('.country').forEach(el => el.onclick = () => {
-    const k = top[+el.dataset.j][1];
-    map.flyToBounds([[k.s - H, k.w - H], [k.nn + H, k.ee + H]], {padding: [40, 40], maxZoom: 7, duration: 1.1});
+    const k = +el.dataset.k;
+    let s = 90, n2 = -90, w = 180, e = -180;
+    for (let i = 0; i < N; i++) if (CT[i] === k && eligibleP(i, pAt(i))) {
+      s = Math.min(s, D.lat[i]); n2 = Math.max(n2, D.lat[i]); w = Math.min(w, D.lon[i]); e = Math.max(e, D.lon[i]); }
+    if (s <= n2) map.flyToBounds([[s - H, w - H], [n2 + H, e + H]], {padding: [40, 40], maxZoom: 7, duration: 1.1});
   });
 }
-
-function renderLegend(byCls) {
-  if (state.mode === 'classes') {
-    $('legend').innerHTML = '<div class="legend-classes">' + Object.keys(RISK).slice().reverse().map(k =>
-      `<div class="lg"><i style="background:${RISK[k]}"></i>${k} <em>${CLASS_RANGE[k] || ''}</em><small>${fmt(byCls[k] || 0)}</small></div>`
-    ).join('') + '</div>';
-  } else {
-    $('legend').innerHTML = '<div class="bar"></div><div class="ticks" style="margin-top:5px"><span>1%</span><span>3%</span><span>10%</span><span>30%</span><span>100%</span></div>';
-  }
-}
-
-function setSeg(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
 
 function applyBase() {
   if (baseLayer) map.removeLayer(baseLayer);
   const [url, attr] = BASES[state.base];
   baseLayer = L.tileLayer(url, {maxZoom: 18, maxNativeZoom: 16, attribution: attr + credit}).addTo(map);
   baseLayer.bringToBack();
-  document.body.classList.toggle('light', theme() === 'light');
-  borderLine.setStyle({color: theme() === 'dark' ? '#ffffff' : '#334155', opacity: theme() === 'dark' ? 0.28 : 0.35});
-  detGroup.setStyle({fillColor: theme() === 'dark' ? '#22d3ee' : '#0e7490'});
-  setSeg('base', state.base);
+  document.body.classList.toggle('dark', theme() === 'dark');
+  borderLine.setStyle({color: theme() === 'dark' ? '#ffffff' : '#334155', opacity: theme() === 'dark' ? 0.22 : 0.35});
+  hl.setStyle({color: outline()});
+  buildColours(); dirty = true;
 }
 function applyOverlays() {
   state.borders ? borderLine.addTo(map) : map.removeLayer(borderLine);
-  state.dets ? detGroup.addTo(map) : map.removeLayer(detGroup);
-  if (state.borders) borderLine.bringToBack();
+  document.body.classList.toggle('noglow', !state.glow);
+  pane.style.opacity = state.opacity / 100;
+  dirty = true;
 }
 
-// ---- popups & hover ----------------------------------------------------------------
-const byIdx = []; cells.forEach(c => byIdx[c.i] = c);
-cellGroup.on('click', e => {
-  const c = byIdx[e.layer.options.i];
-  const col = RISK[c.cls];
-  const ns = c.lat >= 0 ? 'N' : 'S', ew = c.lon >= 0 ? 'E' : 'W';
-  L.popup({maxWidth: 300}).setLatLng(e.latlng).setContent(`
-    <div class="pop-top"><b>${pct(c.p)}</b><span class="pill" style="background:${col};color:${c.cls === 'Low' ? '#111' : '#fff'}">${c.cls}</span></div>
-    <div class="pop-place">${c.country || 'Unassigned'} &middot; ${Math.abs(c.lat).toFixed(2)}°${ns}, ${Math.abs(c.lon).toFixed(2)}°${ew}</div>
-    <div class="pop-bar"><div style="width:${Math.max(2, c.p * 100)}%;background:${c.grad}"></div></div>
-    <div class="pop-grid">
-      <div><span>Max temperature</span><strong>${c.tmax.toFixed(1)} °C</strong></div>
-      <div><span>Min humidity</span><strong>${c.rh.toFixed(0)}%</strong></div>
-      <div><span>Max wind</span><strong>${c.wind.toFixed(1)} m/s</strong></div>
-      <div><span>Rain, last 7 days</span><strong>${c.rain7.toFixed(1)} mm</strong></div>
-      <div><span>Days since rain</span><strong>${c.dsr}</strong></div>
-      <div><span>Detections, 24 h</span><strong>${c.det}</strong></div>
-    </div>
-    ${c.fresh ? '<div class="pop-flag">New-ignition risk: no fire nearby this week</div>' : ''}`).openOn(map);
+// ---- popups & hover -----------------------------------------------------------------
+function cellAt(latlng) {
+  const ll = latlng.wrap();
+  const i = lookup.get(Math.floor((ll.lat + 90) / RES) * NX + Math.floor((ll.lng + 180) / RES));
+  return i !== undefined && eligibleP(i, pAt(i)) ? i : -1;
+}
+const boundsOf = (i, lng) => { const lo = D.lon[i] + 360 * Math.round((lng - D.lon[i]) / 360);
+  return [[D.lat[i] - H, lo - H], [D.lat[i] + H, lo + H]]; };
+let popup = null, popCell = -1;
+function popupHtml(i, k) {
+  const p = PK[k][i], cls = CLASSES[p >= .6 ? 3 : p >= .3 ? 2 : p >= .1 ? 1 : 0][0];
+  const ns = D.lat[i] >= 0 ? 'N' : 'S', ew = D.lon[i] >= 0 ? 'E' : 'W';
+  const bars = K < 2 ? '' : '<div class="pop-days">' + days.map((d, j) =>
+    `<div class="${j === k ? 'on' : ''}">${pct(PK[j][i])}<i style="height:${Math.max(2, Math.round(PK[j][i] * 40))}px;background:${colourOf(PK[j][i])}"></i>${d.chip}</div>`).join('') + '</div>';
+  return `<div class="pop-p">${pct(p)} chance of fire</div>
+    <div class="pop-cls"><i style="background:${state.mode === 'classes' ? RISK[cls] : colourOf(p)}"></i>${cls} risk, ${days[k].title}</div>
+    <div class="pop-place">${D.countries[CT[i]]}, ${Math.abs(D.lat[i]).toFixed(2)}°${ns} ${Math.abs(D.lon[i]).toFixed(2)}°${ew}</div>
+    ${bars}
+    <table>
+      <tr><td>Max temperature</td><td>${(D.tmax[k][i] / 10).toFixed(1)} °C</td></tr>
+      <tr><td>Min humidity</td><td>${D.rh[k][i]}%</td></tr>
+      <tr><td>Max wind</td><td>${(D.wind[k][i] / 10).toFixed(1)} m/s</td></tr>
+      <tr><td>Rain, last 7 days</td><td>${(D.rain7[i] / 10).toFixed(1)} mm</td></tr>
+      <tr><td>Days since rain</td><td>${D.dsr[i]}</td></tr>
+      <tr><td>Fires seen, last 24 h</td><td>${D.det[i]}</td></tr>
+    </table>
+    ${FR[i] ? '<div class="pop-new">New fire area: nothing burned within about 100 km in the last 7 days.</div>' : ''}`;
+}
+map.on('mousemove', e => {
+  const i = picking() ? -1 : cellAt(e.latlng);
+  map.getContainer().classList.toggle('over-cell', i >= 0);
+  if (i < 0) { map.removeLayer(hl); return; }
+  hl.setBounds(boundsOf(i, e.latlng.lng)).addTo(map);
 });
-cellGroup.on('mouseover', e => e.layer.setStyle({stroke: true, color: outline(), weight: 2, opacity: 1}));
-cellGroup.on('mouseout', e => e.layer.setStyle(styleOf(byIdx[e.layer.options.i])));
-detGroup.on('click', e => L.popup().setLatLng(e.latlng)
-  .setContent(`<b>Fire detection</b><div class="pop-place">Fire radiative power ${e.layer.options.frp} MW</div>`).openOn(map));
+map.on('mouseout', () => map.removeLayer(hl));
+map.on('popupclose', () => { popCell = -1; });
 
-// ---- wiring ------------------------------------------------------------------------
-let pending = false;
-$('thr').oninput = e => { state.step = +e.target.value; $('thrVal').textContent = '≥ ' + STEPS[state.step] + '%';
-  if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; sync(false); save(); }); } };
-$('op').oninput = e => { state.opacity = +e.target.value; applyOpacity(); save(); };
-document.querySelectorAll('#mode button').forEach(b => b.onclick = () => { state.mode = b.dataset.v; setSeg('mode', state.mode); sync(true); save(); });
-document.querySelectorAll('#base button').forEach(b => b.onclick = () => { state.base = b.dataset.v; applyBase(); sync(true); save(); });
-$('fresh').onchange = e => { state.fresh = e.target.checked; sync(false); save(); };
-$('dets').onchange = e => { state.dets = e.target.checked; applyOverlays(); save(); };
+// ---- time bar -----------------------------------------------------------------------
+const ICON = {play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+              pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>'};
+function setPlaying(on, remember) {
+  playing = on && K > 1; goto = null;
+  if (playing) { hold = 0; target = t >= K - 1 ? 0 : Math.floor(t) + 1; }
+  $('play').innerHTML = playing ? ICON.pause : ICON.play;
+  if (remember) { state.autoplay = playing; save(); }
+}
+function tick(dt) {                       // returns true when the time changed
+  if (goto !== null) {
+    const dir = Math.sign(goto - t), nt = t + dir * 3.5 * dt;
+    t = (dir > 0 ? nt >= goto : nt <= goto) || dir === 0 ? goto : nt;
+    if (t === goto) goto = null;
+    return true;
+  }
+  if (!playing) return false;
+  if (hold > 0) { hold -= dt; return false; }
+  const dir = Math.sign(target - t), rewind = target === 0 && t > 0;
+  const nt = t + dir * (rewind ? (K - 1) / 0.7 : 1 / 1.3) * dt;
+  if ((dir > 0 ? nt >= target : nt <= target) || dir === 0) {
+    t = target; hold = target === K - 1 ? 2.0 : 1.0; target = target === K - 1 ? 0 : target + 1;
+  } else t = nt;
+  return true;
+}
+function timeUI() {
+  if (document.activeElement !== $('time') || playing) $('time').value = Math.round(t * 100);
+  const k = dayNow();
+  if (k === shownDay) return;
+  shownDay = k;
+  $('tbDate').textContent = days[k].title;
+  $('tbSub').textContent = `${days[k].span} · day ${k + 1} of ${K}`;
+  document.querySelectorAll('#days button').forEach((b, j) => b.classList.toggle('on', j === k));
+  if (popup && popCell >= 0 && map.hasLayer(popup)) popup.setContent(popupHtml(popCell, k));
+}
+$('days').innerHTML = days.map((d, k) => `<button data-k="${k}">${d.chip}</button>`).join('');
+document.querySelectorAll('#days button').forEach(b => b.onclick = () => { setPlaying(false, true); goto = +b.dataset.k; });
+$('time').max = Math.max(1, (K - 1) * 100);
+$('time').oninput = e => { setPlaying(false, true); t = +e.target.value / 100; dirty = true; };
+$('time').onchange = () => { goto = dayNow(); };
+$('play').onclick = () => setPlaying(!playing, true);
+if (K < 2) $('timebar').style.display = 'none';
+
+let last = performance.now(), lastFull = 0;
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  const moved = tick(dt);
+  if (moved || dirty) {
+    const full = !moved || now - lastFull > 220;
+    dirty = false; draw(); stats(full); timeUI();
+    if (full) lastFull = now;
+    if (!moved) lastFull = 0;
+  }
+  requestAnimationFrame(frame);
+}
+map.on('move zoom resize', () => { dirty = true; });
+
+// ---- ground sensors (placeholder: stored in this browser, no live data) --------------
+let devices = [];
+try { devices = JSON.parse(localStorage.getItem('wildfireSensors') || '[]'); } catch (e) {}
+const ESC = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'};
+const esc = s => String(s).replace(/[&<>"]/g, ch => ESC[ch]);
+const place = d => `${Math.abs(d.lat).toFixed(3)}°${d.lat >= 0 ? 'N' : 'S'} ${Math.abs(d.lon).toFixed(3)}°${d.lon >= 0 ? 'E' : 'W'}`;
+map.createPane('sensors').style.zIndex = 620;
+const sensorGroup = L.featureGroup().addTo(map);
+const sensorIcon = L.divIcon({className: '', iconSize: [14, 14],
+  html: '<div style="width:12px;height:12px;background:#2563eb;border:2px solid #fff;box-shadow:0 0 0 1px #2563eb"></div>'});
+let picked = null, pickMarker = null;
+function picking() { return document.body.classList.contains('picking'); }
+function setPicking(on) {
+  document.body.classList.toggle('picking', on);
+  $('iotPick').classList.toggle('picking', on);
+  $('iotPick').textContent = on ? 'Click the map…' : 'Choose place on the map';
+}
+function renderSensors() {
+  try { localStorage.setItem('wildfireSensors', JSON.stringify(devices)); } catch (e) {}
+  sensorGroup.clearLayers();
+  devices.forEach(d => L.marker([d.lat, d.lon], {icon: sensorIcon, pane: 'sensors'}).addTo(sensorGroup)
+    .bindPopup(`<b>${esc(d.name)}</b><div class="pop-place">${esc(d.type)}, ${place(d)}</div>No data yet: live connection is not available.`));
+  $('iotCount').textContent = devices.length ? `${devices.length} added` : 'None added';
+  $('iotList').innerHTML = devices.map((d, k) =>
+    `<div class="device"><i></i><div data-k="${k}" title="Show on the map">${esc(d.name)}<small>${esc(d.type)}, ${place(d)}</small></div>` +
+    `<button data-k="${k}" aria-label="Remove ${esc(d.name)}">Remove</button></div>`).join('') ||
+    '<div class="hint">No sensors yet.</div>';
+  $('iotList').querySelectorAll('.device div').forEach(el => el.onclick = () => {
+    const d = devices[+el.dataset.k]; map.flyTo([d.lat, d.lon], Math.max(map.getZoom(), 7), {duration: 0.8}); });
+  $('iotList').querySelectorAll('.device button').forEach(el => el.onclick = () => { devices.splice(+el.dataset.k, 1); renderSensors(); });
+}
+$('iotPick').onclick = () => setPicking(!picking());
+map.on('click', e => {
+  if (picking()) {
+    const ll = e.latlng.wrap();
+    picked = {lat: +ll.lat.toFixed(4), lon: +ll.lng.toFixed(4)};
+    if (pickMarker) map.removeLayer(pickMarker);
+    pickMarker = L.circleMarker([picked.lat, picked.lon], {radius: 7, color: '#2563eb', weight: 2, fillOpacity: 0, interactive: false, pane: 'sensors'}).addTo(map);
+    $('iotPlace').textContent = place(picked);
+    $('iotAdd').disabled = false;
+    setPicking(false);
+    return;
+  }
+  const i = cellAt(e.latlng);
+  if (i < 0) return;
+  popCell = i;
+  popup = L.popup({maxWidth: 290}).setLatLng(e.latlng).setContent(popupHtml(i, dayNow())).openOn(map);
+});
+$('iotAdd').onclick = () => {
+  if (!picked) return;
+  devices.push({name: $('iotName').value.trim() || `Sensor ${devices.length + 1}`, type: $('iotType').value, ...picked});
+  picked = null; if (pickMarker) { map.removeLayer(pickMarker); pickMarker = null; }
+  $('iotName').value = ''; $('iotPlace').textContent = 'No place chosen'; $('iotAdd').disabled = true;
+  renderSensors();
+};
+
+// ---- wiring -------------------------------------------------------------------------
+function applyOpen() { $('panel').classList.toggle('closed', !state.open); $('collapse').textContent = state.open ? '−' : '+'; }
+function applyIotOpen() { $('iot').classList.toggle('closed', !state.iotOpen); $('iotCollapse').textContent = state.iotOpen ? '−' : '+'; }
+$('collapse').onclick = () => { state.open = !state.open; if (state.open && phone.matches) state.iotOpen = false;
+  applyOpen(); applyIotOpen(); save(); };
+$('iotCollapse').onclick = () => { state.iotOpen = !state.iotOpen; if (state.iotOpen && phone.matches) state.open = false;
+  applyOpen(); applyIotOpen(); save(); };
+$('thr').oninput = e => { state.step = +e.target.value; dirty = true; save(); };
+$('op').oninput = e => { state.opacity = +e.target.value; applyOverlays(); save(); };
+$('classes').onchange = e => { state.mode = e.target.checked ? 'classes' : 'gradient'; buildColours(); dirty = true; save(); };
+$('glow').onchange = e => { state.glow = e.target.checked; applyOverlays(); save(); };
+$('base').onchange = e => { state.base = e.target.value; applyBase(); save(); };
+$('fresh').onchange = e => { state.fresh = e.target.checked; dirty = true; save(); };
+$('dets').onchange = e => { state.dets = e.target.checked; dirty = true; save(); };
 $('borders').onchange = e => { state.borders = e.target.checked; applyOverlays(); save(); };
-$('collapse').onclick = () => { state.open = !state.open; $('panel').classList.toggle('closed', !state.open); save(); };
 
-// ---- init --------------------------------------------------------------------------
+// ---- init ---------------------------------------------------------------------------
 state.step = Math.max(0, Math.min(STEPS.length - 1, state.step | 0));
-$('thr').value = state.step; $('op').value = state.opacity;
+if (phone.matches && state.open && state.iotOpen) state.iotOpen = false;
+$('thr').value = state.step; $('op').value = state.opacity; $('base').value = state.base;
+$('classes').checked = state.mode === 'classes'; $('glow').checked = state.glow;
 $('fresh').checked = state.fresh; $('dets').checked = state.dets; $('borders').checked = state.borders;
-$('panel').classList.toggle('closed', !state.open);
-setSeg('mode', state.mode);
-$('valid').textContent = META.valid;
-$('nFresh').textContent = fmt(cells.filter(c => c.fresh).length);
+applyOpen(); applyIotOpen(); renderSensors();
+$('valid').textContent = `${K}-day outlook, ${days[0].span.split(' →')[0]} UTC`;
+$('km').textContent = Math.round(RES * 111);
+$('nFresh').textContent = fmt(FR.reduce((a, b) => a + b, 0));
 $('nDets').textContent = fmt(P.length);
 $('meta').innerHTML = META.rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
-applyBase(); applyOverlays(); applyOpacity(); sync(false);
+applyBase();
+setPlaying(false);
+requestAnimationFrame(now => { last = now; frame(now); applyOverlays(); });   // first draw, then fade the squares in
+if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
 </script>
 </body></html>

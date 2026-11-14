@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -49,8 +50,19 @@ def grib_url(cycle: pd.Timestamp, step: int) -> str:
             f"gfs.t{cycle:%H}z.pgrb2.{RES_TAG}.f{step:03d}")
 
 
+def _get_retry(url: str, tries: int = 8, **kw):
+    """GET that survives short network outages (waits 10, 20, ... s between attempts)."""
+    for attempt in range(tries):
+        try:
+            return _session.get(url, **kw)
+        except requests.RequestException:
+            if attempt == tries - 1:
+                raise
+            time.sleep(10 * (attempt + 1))
+
+
 def _read_idx(url: str):
-    r = _session.get(url + ".idx", timeout=60)
+    r = _get_retry(url + ".idx", timeout=60)
     if r.status_code != 200:
         return None
     lines = r.text.strip().splitlines()
@@ -77,14 +89,15 @@ def _locate(entries, var, level, desc_re=None):
 
 def _fetch(url, s, e) -> bytes:
     rng = f"bytes={s}-{e}" if e is not None else f"bytes={s}-"
-    for attempt in range(4):
+    for attempt in range(8):
         try:
             r = _session.get(url, headers={"Range": rng}, timeout=120)
             r.raise_for_status()
             return r.content
         except requests.RequestException:
-            if attempt == 3:
+            if attempt == 7:
                 raise
+            time.sleep(10 * (attempt + 1))
 
 
 def _decode(msg: bytes) -> np.ndarray:
@@ -225,14 +238,64 @@ def latest_window(tau: pd.Timestamp, hours: int = 24):
     raise MissingGFS(f"no GFS cycle covers {tau}")
 
 
-def weather_features(window: dict, past: dict, lat, lon) -> pd.DataFrame:
-    """Sample GFS fields (bilinear) at cell centres and build the weather feature columns."""
+def sample(a, lat, lon, order: int = 1) -> np.ndarray:
+    """Sample a global 0.5 deg field at points (bilinear by default, ``order=0`` = nearest)."""
     rows = (90.0 - np.asarray(lat)) / RES_DEG
     cols = (np.asarray(lon) % 360.0) / RES_DEG
+    a = np.concatenate([a, a[:, :1]], axis=1)  # wrap at 360 deg
+    return ndimage.map_coordinates(a, [rows, cols], order=order, mode="nearest").astype(np.float32)
 
+
+# ---------------------------------------------------------------------------
+# Land: elevation, soil type, vegetation (static GFS fields, cached once)
+# ---------------------------------------------------------------------------
+STATIC_FILE = "gfs_static.npz"
+STATIC_FEATURES = ["veg", "elev", "soiltype"]
+
+
+def static_fields(cache: Path) -> dict:
+    """Elevation, soil type and the monthly vegetation fraction (%) on the GFS grid."""
+    path = cache / STATIC_FILE
+    if path.exists():
+        with np.load(path) as z:
+            return {k: z[k] for k in z.files}
+    cache.mkdir(parents=True, exist_ok=True)
+    veg, out = [], {}
+    for month in range(1, 13):
+        url = grib_url(pd.Timestamp(2025, month, 15), 0)
+        idx = _read_idx(url)
+        if idx is None:
+            raise MissingGFS(f"static GFS fields for month {month} not available")
+        wanted = [("VEG", "surface")] + ([("HGT", "surface"), ("SOTYP", "surface")] if month == 1 else [])
+        for var, lev in wanted:
+            arr = _decode(_fetch(url, *_locate(idx, var, lev)))
+            if var == "VEG":
+                veg.append(np.where(arr > 100, 0.0, arr).astype(np.float32))  # 9999 = no vegetation data (sea, ice)
+            else:
+                out[var.lower()] = arr
+    out["veg"] = np.stack(veg)
+    np.savez_compressed(path, **out)
+    return out
+
+
+def static_features(static: dict, month: int, lat, lon) -> pd.DataFrame:
+    return pd.DataFrame({
+        "veg": sample(static["veg"][month - 1], lat, lon),
+        "elev": sample(static["hgt"], lat, lon),
+        "soiltype": sample(static["sotyp"], lat, lon, order=0),
+    })
+
+
+def window_for_cycle(cycle: pd.Timestamp, tau: pd.Timestamp, hours: int = 24) -> dict:
+    """Fields for [tau, tau+hours) from one given GFS cycle (so all forecast days share the same run)."""
+    off = int(np.ceil((tau - cycle) / pd.Timedelta(hours=3))) * 3
+    return window_fields(cycle, [off + k for k in range(0, hours + 1, 6)])
+
+
+def weather_features(window: dict, past: dict, lat, lon) -> pd.DataFrame:
+    """Sample GFS fields (bilinear) at cell centres and build the weather feature columns."""
     def s(a):
-        a = np.concatenate([a, a[:, :1]], axis=1)  # wrap at 360 deg
-        return ndimage.map_coordinates(a, [rows, cols], order=1, mode="nearest").astype(np.float32)
+        return sample(a, lat, lon)
 
     out = {k: s(window[k]) for k in DAILY_FIELDS}
     out["precip_24h"] = out.pop("precip")

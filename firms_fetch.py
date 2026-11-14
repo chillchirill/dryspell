@@ -14,6 +14,7 @@ https://firms.modaps.eosdis.nasa.gov/map/):
 from __future__ import annotations
 
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
@@ -48,25 +49,36 @@ def _download(url: str, dest: Path, max_age_hours: float = 3.0, timeout: int = 3
     if dest.exists() and (time.time() - dest.stat().st_mtime) < max_age_hours * 3600:
         print(f"  cached   {dest.name}")
         return dest
-    shown = url.split("/api/area/csv/")[0] + "/api/area/csv/<MAP_KEY>/" + url.split("/api/area/csv/")[1].split("/", 1)[1] if "/api/area/csv/" in url else url
+    shown = re.sub(r"(/api/\w+/csv/)[^/]+/", r"\g<1><MAP_KEY>/", url)  # never print the key
     print(f"  download {shown}")
-    for attempt in range(30):
-        r = requests.get(url, headers=HEADERS, stream=True, timeout=timeout)
-        if r.status_code == 400 and "transaction limit" in r.text:
-            r.close()  # FIRMS API quota (5000 transactions / 10 min): wait and retry
-            print(f"  FIRMS API quota reached, waiting 60 s ({dest.name})")
-            time.sleep(60)
-            continue
-        break
-    with r:
-        if r.status_code >= 400:
-            raise RuntimeError(f"HTTP {r.status_code} for {shown}: {r.text[:200]}")
-        tmp = dest.with_suffix(dest.suffix + ".part")
-        with open(tmp, "wb") as fh:
-            for chunk in r.iter_content(1 << 20):
-                fh.write(chunk)
-    tmp.replace(dest)
-    return dest
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    net_errors = 0
+    for attempt in range(60):
+        try:
+            r = requests.get(url, headers=HEADERS, stream=True, timeout=timeout)
+            if r.status_code == 400 and "transaction limit" in r.text:
+                r.close()  # FIRMS API quota (5000 transactions / 10 min): wait and retry
+                print(f"  FIRMS API quota reached, waiting 60 s ({dest.name})")
+                time.sleep(60)
+                continue
+            with r:
+                if r.status_code >= 400:
+                    raise RuntimeError(f"HTTP {r.status_code} for {shown}: {r.text[:200]}")
+                with open(tmp, "wb") as fh:
+                    for chunk in r.iter_content(1 << 20):
+                        fh.write(chunk)
+            tmp.replace(dest)
+            return dest
+        except requests.RequestException as exc:
+            # network hiccup (DNS, reset, timeout): wait and retry. The original exception text
+            # contains the full URL, so only its type is reported - the key must not reach a log.
+            net_errors += 1
+            if net_errors > 12:
+                raise RuntimeError(f"network error for {shown}: {type(exc).__name__}") from None
+            wait = min(300, 15 * net_errors)
+            print(f"  network error ({type(exc).__name__}), retry {net_errors}/12 in {wait} s ({dest.name})")
+            time.sleep(wait)
+    raise RuntimeError(f"gave up on {shown} (FIRMS API quota)")
 
 
 def fetch_nrt(raw_dir: Path, sources=DEFAULT_SOURCES, offline: bool = False) -> list[Path]:
@@ -92,6 +104,23 @@ def load_env(path: Path) -> None:
                 os.environ.setdefault(k.strip(), v.strip())
 
 
+def sp_archive_end(raw_dir: Path, map_key: str, sources) -> dict:
+    """Last day covered by the science-quality (``_SP``) twin of each ``_NRT`` source.
+
+    Near-real-time files are kept for a few months only; older days are served by the
+    standard-processing archive of the same satellite. Returns {} if the lookup fails.
+    """
+    try:
+        p = _download(f"{FIRMS_URL}/api/data_availability/csv/{map_key}/all",
+                      raw_dir / "data_availability.csv", max_age_hours=24)
+        av = pd.read_csv(p).set_index("data_id")["max_date"]
+        return {s: date.fromisoformat(av[s.replace("_NRT", "_SP")]) for s in sources
+                if s.replace("_NRT", "_SP") in av.index and s.endswith("_NRT")}
+    except Exception as exc:
+        print(f"  warning: FIRMS data-availability lookup failed ({exc}); using NRT sources only")
+        return {}
+
+
 def fetch_api(raw_dir: Path, map_key: str, days: int, sources=DEFAULT_SOURCES,
               area: str = "world", end: date | None = None, workers: int = 2) -> list[Path]:
     """FIRMS Area API, at least ``days`` days ending at ``end`` (default: today, UTC).
@@ -99,25 +128,36 @@ def fetch_api(raw_dir: Path, map_key: str, days: int, sources=DEFAULT_SOURCES,
     Requests are split into 5-day chunks aligned to a fixed calendar, so older
     chunks are downloaded once and reused by later runs; only the chunk that
     contains today is refreshed. ``area`` is ``world`` or ``west,south,east,north``.
+    Days already covered by the science-quality archive are taken from the ``_SP``
+    twin of each source, so any number of past years can be requested.
     """
     end = end or pd.Timestamp.now(tz="UTC").date()
     start = end - timedelta(days=days - 1)
     epoch = date(2000, 1, 1)
     start -= timedelta(days=(start - epoch).days % API_MAX_DAYS_PER_CALL)
     tag = area.replace(",", "_")
+    sp_end = sp_archive_end(raw_dir, map_key, sources)
     jobs = []
     for src in sources:
         d = start
         while d <= end:
             n = API_MAX_DAYS_PER_CALL
-            dest = raw_dir / f"api_{src}_{tag}_{d}_{n}d.csv"
-            url = f"{FIRMS_URL}/api/area/csv/{map_key}/{src}/{area}/{n}/{d}"
-            # complete past chunks never change; the chunk that is still filling is refreshed
-            age = 2.0 if d + timedelta(days=n) > end else 1e9
-            if d + timedelta(days=n) > end and dest.exists() and \
-                    (time.time() - dest.stat().st_mtime) / 86400 > (end - d).days + 1:
-                age = 0  # was downloaded before the chunk's last day ended
-            jobs.append((url, dest, age, src, d))
+            cut = sp_end.get(src)
+            if cut and d + timedelta(days=n - 1) <= cut:
+                parts = [(src.replace("_NRT", "_SP"), d, n)]
+            elif cut and d <= cut:  # chunk straddles the end of the archive: split it
+                k = (cut - d).days + 1
+                parts = [(src.replace("_NRT", "_SP"), d, k), (src, cut + timedelta(days=1), n - k)]
+            else:
+                parts = [(src, d, n)]
+            for s_, d_, n_ in parts:
+                dest = raw_dir / f"api_{s_}_{tag}_{d_}_{n_}d.csv"
+                url = f"{FIRMS_URL}/api/area/csv/{map_key}/{s_}/{area}/{n_}/{d_}"
+                # complete past chunks never change; the chunk that is still filling is refreshed
+                age = 2.0 if d_ + timedelta(days=n_) > end else 1e9
+                if d_ + timedelta(days=n_) > end and dest.exists() and                         (time.time() - dest.stat().st_mtime) / 86400 > (end - d_).days + 1:
+                    age = 0  # was downloaded before the chunk's last day ended
+                jobs.append((url, dest, age, s_, d_))
             d += timedelta(days=n)
 
     def one(job):
