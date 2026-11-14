@@ -1,6 +1,6 @@
 # Fuel and observation parameter manifest
 
-Manifest: `dryspell-combustion-v1`. Engine: `surface-grid-1.3.0`. Reviewed 14 November 2026. This is an illustrative surface-fuel model with declared assumptions, not a calibrated fire-behaviour or air-quality prediction system.
+Manifest: `dryspell-combustion-v1`. Engine: `surface-grid-1.3.2`. Reviewed 14 November 2026. This is an illustrative surface-fuel model with declared assumptions, not a calibrated fire-behaviour or air-quality prediction system.
 
 ## Implemented stage and provenance
 
@@ -53,13 +53,32 @@ In the selected profiles, grass is residual by 300 seconds while woodland still 
 
 Heat uses the current sensible source, cell area and a normalized local Gaussian with source variance `cellSizeM² / 12`. Its additional variance is `2 × heatDiffusion × heatResidence`. The temperature-excess kernel contains `heatGroundFraction × heatResidence / (airDensity × airHeatCapacity × heatLayer)`. Every coefficient therefore has a named unit and a physical interpretation, but its numerical choice is uncalibrated.
 
+Engine1.3.1 corrects the nearly invisible nearby thermal response by changing only the three heat-coupling coefficients below. On25m cells the former sigma9.6m/cutoff38.4m produced approximately0.12C at25m from an isolated young grass source, easily lost in sensor noise. The revised sigma49.5m/cutoff198m produces a visible, smoothly decaying approach/passage/recovery curve. Relative humidity continues to follow temperature at fixed ambient vapour pressure. These are illustrative observation assumptions, not calibrated physical transport; fire arrival, fuel consumption, smoke coefficients, weather and UI are unchanged. The version increment prevents replaying old measurements under the changed thermal response without recomputation.
+
+Engine 1.3.2 additionally distinguishes direct exposure inside a burning source cell from diffuse nearby heating. The preceding broad Gaussian diluted even a directly crossing grass front to a small temperature rise. The added local-air excess is
+
+`contactFraction × contactResidence × interpolatedLocalHeatFlux / (airDensity × airHeatCapacity × contactLayer)`.
+
+The sensible flux remains the same fuel-consumption source in W/m². The extra coefficient has units K/(W/m²): a chosen 0.25 source fraction, 15-second local heat-exchange residence and one-metre effective air layer. This is a quasi-steady, unresolved near-source air compartment, with the existing sensor response time applied afterward. It is **not** a measured flame temperature, direct radiation heating of the sensor body, an independently integrated heat reservoir, or calibrated real hardware exposure. The diffuse and contact source fractions sum to 0.50; neither term alters combustion or smoke. This observation approximation still does not establish a domain-wide conserved transported heat field.
+
+Local flux is bilinearly interpolated from cell-centre source densities with weights `max(0, 1 - abs(dx)/cellWidth) × max(0, 1 - abs(dy)/cellHeight)`. Each source's contribution is zero at an adjacent cell centre, so the existing 25/50/100 m off-strip response remains unchanged on the 25 m fixture. Interior weights across neighbouring cells sum to one; there is no cell-area amplification or doubled source at a shared boundary. Unknown, unreached and nonburnable cells contribute zero. Consequently an isolated burning cell contributes half its contact term at an edge and one quarter at a corner surrounded by nonburnable cells. That smooth reduction explicitly represents unresolved partial-cell exposure; it is not a claim of a resolved subcell flame shape. It can extend by half a cell beyond a burning cell's polygon, while its footprint scales with numerical resolution.
+
+Both local and diffuse contributions decay with the same source flux after fuel consumption. Their sum enters the unchanged −45 to 150 °C target clamp and saturation quality, and humidity continues to derive from the bounded air temperature at fixed ambient vapour pressure. Sensor lag and noise remain unchanged. Direct nominal dry-grass crossing is therefore visibly stronger without raising the distant heat field globally.
+
+Executed controlled-fixture checks for this correction used 25 m cells, ambient 25 °C / 40% RH, and a grass strip whose front passes through the sensor cell. Calm wind produced a 98.029 °C peak at 645 seconds (8.695% RH); 4 m/s west wind produced 98.282 °C at 420 seconds (7.323% RH). The sensor's cell was flaming at both peaks. At 3,600 seconds both matched the no-fire run's reported temperature/humidity to 0.01 units. For an isolated grass cell surrounded by nonburnable cells, measured peak temperatures at centre, 6.25 m interior offset, 12.5 m edge and 12.5/12.5 m corner were respectively 90.676, 75.122, 59.517 and 43.748 °C. Boundary reduction is intentional interpolation, not universal ≥70 °C exposure everywhere inside a coarse polygon.
+
+`npx vitest run packages/simulation/src/thermal-response.test.ts packages/simulation/src/combustion.test.ts packages/simulation/src/observation-replay.test.ts` passed 18 tests in three files. These include direct crossing/recovery/rewind, retained 25/50/100 m falloff, cell-interior and boundary weights, unchanged smoke under heat-only changes, and woodland target saturation. These synthetic numerical results do not constitute browser validation or physical calibration.
+
 Smoke combines a local diffusive kernel with a downwind steady-plume approximation. The plume evaluates the actual fuel smoke source at retarded emission age `age - distance / windSpeed`; it does not emit before ignition. Current wind defines its direction, so an abrupt wind turn can still reorient the inferred plume. Calm wind uses the local kernel and remains well defined. Air transport is not blocked by water or buildings. These kernels are not a domain-wide conserved mass ledger; they must not be advertised as historical mass-conserving Gaussian puffs.
 
 | Observation parameter | Value | Unit / interpretation |
 | --- | ---: | --- |
-| Near-ground heat fraction | 0.02 | dimensionless chosen sensible-heat fraction entering reduced layer |
-| Heat residence | 20 | s |
-| Heat diffusion | 1 | m²/s |
+| Near-ground heat fraction | 0.25 | dimensionless chosen sensible-heat fraction entering reduced layer |
+| Heat residence | 60 | s |
+| Heat diffusion | 20 | m²/s |
+| Direct-contact heat fraction | 0.25 | dimensionless chosen sensible-heat fraction for the local source-cell air compartment |
+| Direct-contact heat residence | 15 | s; quasi-steady local exchange assumption |
+| Direct-contact heat layer | 1 | m; effective local layer, not measured flame height |
 | Air density | 1.2 | kg/m³ reference value |
 | Air specific heat | 1005 | J/(kg·K) reference value |
 | Effective heat layer | 3 | m |
@@ -81,7 +100,7 @@ Humidity preserves ambient vapour partial pressure while local air warms. Below 
 
 ## Replay, numerical limits and deferred V2 work
 
-Engine version 1.3.0 and manifest identity enter checkpoint compatibility. Old 1.2.0 checkpoints are rejected; saved inputs can be recomputed under the new version. Arrival time plus immutable profile parameters reconstruct fuel remaining and sources exactly, so no mutable fuel array is lost during rewind. Sensor lag/noise state remains checkpointed.
+Engine version 1.3.2 and manifest identity enter checkpoint compatibility. Older engine checkpoints are rejected; saved inputs can be recomputed under the new version. Arrival time plus immutable profile parameters reconstruct fuel remaining and sources exactly, so no mutable fuel array is lost during rewind. Sensor lag/noise state remains checkpointed.
 
 The graph front remains a baseline, not the proposed level-set solver. A zero-rate published-fuel edge stops immediately and does not wait for later dry weather to restart. No grid-centre travel-time cutoff based on combustion duration was added: that shortcut would falsely extinguish slow fronts merely because cells were coarser. Continuous subcell front history and physical cold-front extinction are still level-set-stage work.
 

@@ -110,13 +110,13 @@ test('late weather failure cannot replace an imported frozen experiment',async({
 
 test('custom numeric hours and legacy thirty-minute model migration remain explicit',async({page})=>{
  const {point}=await setup(page);await place(page,'Combined',point);await place(page,'Fire',point);const original=await exported(page);
- expect(original.scenario.config.durationSec).toBe(21600);expect(original.engineVersion).toBe('surface-grid-1.3.0');
+ expect(original.scenario.config.durationSec).toBe(21600);expect(original.engineVersion).toBe('surface-grid-1.3.2');
  for(const hours of [1,3,6,12.5,48,1000]){await page.getByRole('button',{name:'Experiment menu',exact:true}).click();await page.getByRole('spinbutton',{name:'Duration in hours',exact:true}).fill(String(hours));await page.getByRole('spinbutton',{name:'Duration in hours',exact:true}).press('Enter');await expect(page.getByRole('slider',{name:'Simulation timeline'})).toHaveAttribute('max',String(hours*3600));await expect(page.getByRole('button',{name:'Close inspector',exact:true})).toHaveCount(0);}
  await weatherSettings(page);await expect(page.getByText('Hold last weather after 384:00:00',{exact:true})).toBeVisible();await closeInspector(page);
  const legacy={...original,engineVersion:'surface-grid-1.1.2',cursorSec:10,computedUntilSec:30,scenario:{...original.scenario,authoritativeTimeSec:30,config:{...original.scenario.config,durationSec:1800}}};
  await page.locator('input[type=file]').setInputFiles({name:'legacy-thirty-minute.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(legacy))});
  await expect(page.getByText('Model updated; run again.',{exact:true})).toBeVisible();await expect(page.getByRole('slider',{name:'Simulation timeline'})).toHaveAttribute('max','1800');await expect(page.locator('main')).toHaveAttribute('data-frame-time','0');
- const migrated=await exported(page);expect(migrated.scenario.config.durationSec).toBe(1800);expect(migrated.engineVersion).toBe('surface-grid-1.3.0');expect(migrated.cursorSec).toBe(0);expect(migrated.computedUntilSec).toBe(0);expect(migrated.scenario.sensors).toEqual(original.scenario.sensors);expect(migrated.environment.landscape.cells[0].sourceClassCode).toBe(original.environment.landscape.cells[0].sourceClassCode);
+ const migrated=await exported(page);expect(migrated.scenario.config.durationSec).toBe(1800);expect(migrated.engineVersion).toBe('surface-grid-1.3.2');expect(migrated.cursorSec).toBe(0);expect(migrated.computedUntilSec).toBe(0);expect(migrated.scenario.sensors).toEqual(original.scenario.sensors);expect(migrated.environment.landscape.cells[0].sourceClassCode).toBe(original.environment.landscape.cells[0].sourceClassCode);
  await page.getByRole('button',{name:'Experiment menu',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Duration in hours',exact:true})).toHaveValue('0.5');await page.getByRole('spinbutton',{name:'Duration in hours',exact:true}).fill('12.5');await page.getByRole('spinbutton',{name:'Duration in hours',exact:true}).press('Enter');await expect(page.getByRole('slider',{name:'Simulation timeline'})).toHaveAttribute('max','45000');
 });
 

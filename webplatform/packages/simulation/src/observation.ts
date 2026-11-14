@@ -2,7 +2,7 @@ import type {Coordinate,LandscapeSnapshot,WeatherSample} from '@dryspell/contrac
 import {combustionAt,type CombustionProfile} from './combustion';
 
 /** Named reduced observation parameters; see docs/FUEL_PARAMETER_MANIFEST.md. */
-export const OBSERVATION_PARAMETERS={heatGroundFraction:.02,heatResidenceSec:20,heatDiffusionM2Sec:1,airDensityKgM3:1.2,airHeatCapacityJkgK:1005,heatLayerM:3,smokeGroundFraction:.25,smokeLayerM:20,smokeDiffusionM2Sec:4,smokeLocalResidenceSec:30,smokeRemovalSec:240,maxSmokeTravelSec:600,smokeC50KgM3:1e-5,minimumTemperatureC:-45,maximumTemperatureC:150} as const;
+export const OBSERVATION_PARAMETERS={heatGroundFraction:.25,heatResidenceSec:60,heatDiffusionM2Sec:20,contactHeatFraction:.25,contactHeatResidenceSec:15,contactHeatLayerM:1,airDensityKgM3:1.2,airHeatCapacityJkgK:1005,heatLayerM:3,smokeGroundFraction:.25,smokeLayerM:20,smokeDiffusionM2Sec:4,smokeLocalResidenceSec:30,smokeRemovalSec:240,maxSmokeTravelSec:600,smokeC50KgM3:1e-5,minimumTemperatureC:-45,maximumTemperatureC:150} as const;
 export function saturationPressurePa(temperatureC:number):number {
   const t=temperatureC+273.15;
   if(temperatureC<-45||temperatureC>150)throw new Error('Humidity model temperature range is -45..150 °C');
@@ -37,7 +37,11 @@ export function sourceObservationTargets(grid:LandscapeSnapshot,geometry:ReturnT
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
     const i=y*grid.width+x,profile=profiles[i];if(!profile||arrival[i]>field.timeSec)continue;
     const dx=sx-(x+.5)*geometry.dx,dy=sy-(y+.5)*geometry.dy,d2=dx*dx+dy*dy;
-    const local=d2<=16*Math.max(heatVariance,localVariance)?('sampleAt' in field?field.sampleAt(i):{heatFluxWm2:field.heat[i],smokeFluxKgM2Sec:field.smoke[i]}):undefined;
+    // Compact bilinear interpolation of the local source density. Adjacent weights
+    // partition unity: no cell-area gain, double counting at edges, or distant boost.
+    const contactWeight=Math.max(0,1-Math.abs(dx)/geometry.dx)*Math.max(0,1-Math.abs(dy)/geometry.dy);
+    const local=contactWeight>0||d2<=16*Math.max(heatVariance,localVariance)?('sampleAt' in field?field.sampleAt(i):{heatFluxWm2:field.heat[i],smokeFluxKgM2Sec:field.smoke[i]}):undefined;
+    if(contactWeight>0)excessK+=contactWeight*local!.heatFluxWm2*p.contactHeatFraction*p.contactHeatResidenceSec/(p.airDensityKgM3*p.airHeatCapacityJkgK*p.contactHeatLayerM);
     if(d2<=16*heatVariance)excessK+=p.heatGroundFraction*local!.heatFluxWm2*area*p.heatResidenceSec/(p.airDensityKgM3*p.airHeatCapacityJkgK*p.heatLayerM*2*Math.PI*heatVariance)*Math.exp(-d2/(2*heatVariance));
     if(d2<=16*localVariance)smokeKgM3+=p.smokeGroundFraction*local!.smokeFluxKgM2Sec*area*p.smokeLocalResidenceSec/(2*Math.PI*localVariance*p.smokeLayerM)*Math.exp(-d2/(2*localVariance));
     if(speed<.2)continue;

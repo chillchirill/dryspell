@@ -7,7 +7,7 @@ import {observationGeometry,queriedSourceFieldAt,sourceObservationTargets,type Q
 export { PUBLISHED_FUELS, equivalentDeadSpreadMps } from './fuels';
 export * from './combustion';
 export * from './observation';
-export const ENGINE_VERSION = 'surface-grid-1.3.0';
+export const ENGINE_VERSION = 'surface-grid-1.3.2';
 const RAD = Math.PI / 180;
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 export const checksum = (x: unknown) => sha256Hex(JSON.stringify(x));

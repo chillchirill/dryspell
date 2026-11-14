@@ -5,8 +5,8 @@ import {fixture} from './test-fixture';
 describe('bounded long-duration engine',()=>{
   it('pins the new versioned combustion model six-hour frame checksums',()=>{
     const {s,e}=fixture();s.config.durationSec=21600;e.weather.samples.push({...e.weather.samples[0],timeSec:21600,windSpeedMps:4,windFromDeg:270});
-    // 1.2.0 results were deliberately superseded by the fuel-consumption/observation model.
-    const expected=['9020761de1ec980296ad30bdf60698bfd73050745073866cbd99261df09211af','ffeb2515f1359df5b5c34d5d26ad85066c4aa7f4d6d355521e439c361c31a9b1','3e38c4a10655f0082a4b43071d07c34dc97a529c286c27f3238483ab529ff051','7581a381448c99b7ed1c2c9c9c424d97ae244585fa9d131402e1a27eead746e2'];
+    // 1.3.2 adds local burning-cell heat coupling and its derived relative humidity.
+    const expected=['3cd6b9cb32fc27990950b6c664ff10b8ae52c6bfa228873b59f9a4c5ed9d5353','361526bc6dd2a6b3abfae5400aed09ff4aba6fb5c3d3b0e27a952e6e96ca2b57','78e4e58adc4954b99e491c29fe1566e41c48ac03ab8672927632afcc223e74a6','044f9bbf81a378335584cb12e9b820d62c02f3a1c80f8edb3e4e3d3a23e90c44'];
     expect([0,30,300,21600].map(t=>simulateFrame(s,e,t).checksum)).toEqual(expected);
   });
   it('handles huge constant tails without allocating horizon-sized rate arrays',()=>{
