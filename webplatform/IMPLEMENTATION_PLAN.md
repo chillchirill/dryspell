@@ -1,6 +1,6 @@
 # Dryspell: IoT Fire Monitoring and Spread Prediction
 
-English implementation plan for Codex CLI. Research checked on 13 November 2026.
+English implementation plan for Codex CLI. Research checked on 13 November 2026. Expanded frontend and UX specification added on the same date.
 
 ## 1. Objective and confirmed decisions
 
@@ -60,6 +60,7 @@ Use a TypeScript npm workspace within `webplatform/`; the executable services st
 | --- | --- |
 | Web/API server | Express, `ws`, Zod validation, structured logging. Serve REST, static React assets, sessions, and WebSocket upgrades on port 4000. |
 | Client | React and Vite; TanStack Query for server state; TanStack Table for the sensor list, sorting, and filter state. |
+| UI foundations | Radix Primitives for accessible interactions, CSS Modules and shared CSS tokens for Dryspell's own visual system; Lucide React for one consistent icon family. |
 | Mapping | MapLibre GL JS with GeoJSON sensor layers and fixed-scale raster/grid probability overlays. Add a small custom map interaction for placing and moving sensors. |
 | Charts | Apache ECharts: three synchronized time series with zoom, missing-data gaps, threshold markers, and shared cursor. |
 | Database | PostgreSQL with `pg`, SQL migrations, and PostGIS for locations, areas, and spatial queries. Use one PostgreSQL container with a persistent volume. |
@@ -209,7 +210,116 @@ Core entities:
 
 Index `(sensor_id, recorded_at)`, source/context/time, job status, and spatial geometry. Keep large grid frames compressed in a managed data directory with database metadata, hashes, atomic writes, and coordinated backup. Do not store a JSON object per cell per animation frame. Introduce telemetry partitioning only when measured volume warrants it [T3].
 
-## 7. Map, charts, and filters
+## 7. Frontend design, map interaction, and UX specification
+
+This section is a required implementation specification, not an optional styling pass. A technically functional screen is incomplete until its composition, interaction states, responsive behaviour, and visual review meet the criteria below.
+
+### 7.1. Design skill and required workflow
+
+Use **Anthropic's `frontend-design` skill** as the design workflow for frontend implementation and visual review [U1]. Its upstream source is:
+
+<https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md>
+
+Before writing frontend components, Codex must read this entire section and the complete skill. Reuse an available installation of the skill; otherwise retrieve and read its official source in the implementation environment. Record the reviewed revision or content checksum and access date in `docs/DESIGN_REFERENCES.md`. If a copy is installed, preserve its upstream licence and attribution. Reading a linked skill does not mean it has been installed in a different Ubuntu/Codex environment.
+
+The project-level `AGENTS.md` connects this requirement to frontend work. The skill supplies a design process; this plan supplies Dryspell's product decisions. Resolve stylistic choices in favour of the specified monitoring workflow, readability, and accessibility. Do not add a marketing hero to the application because a general design reference discusses landing pages.
+
+Use the following workflow without introducing a mandatory approval pause:
+
+1. Identify the operator's task, the information they need first, and the decisions available on each screen.
+2. Review a few relevant references: NASA FIRMS for spatial monitoring, Carbon for information and chart hierarchy, and this specification for Dryspell's identity [D5, U2]. Record useful principles rather than copying another product's screen.
+3. Define the layout and design tokens before building the whole component library.
+4. Build one representative monitoring screen with realistic sensor data, then its selected-sensor, alert, and mobile states. Use rendered browser layouts or visual wireframes rather than ASCII diagrams.
+5. Inspect actual browser screenshots and complete the primary user journeys. Correct spacing, hierarchy, legibility, and interaction problems before expanding to all screens.
+6. Apply the same system to administration, historical playback, and simulation. Repeat the visual and interaction review after integration.
+
+The result should feel purpose-built for environmental monitoring. Avoid an interchangeable dashboard template, decorative effects unrelated to the data, and claims that visual polish guarantees prediction accuracy.
+
+### 7.2. Visual direction
+
+**Direction: a calm, precise field-monitoring console with the map as its main working surface.**
+
+Use a light, cool-neutral application shell, white inspection surfaces, restrained evergreen actions, and a low-saturation basemap. Reserve warm signal colours for temperature and fire evidence. Convey character through geographic context, typography, aligned readings, and well-composed controls.
+
+The initial view opens directly into monitoring. Do not add a promotional welcome screen, oversized heading, ornamental statistic cards, fake testimonials, AI-generated scenic imagery, or an animated background. Site branding is a compact Dryspell wordmark; a custom illustrated logo is a separate task.
+
+The visual hierarchy is: **location and time context, relevant sensors/incidents, selected evidence, then advanced configuration**. Secondary information remains reachable without competing with the main task.
+
+Design rules:
+
+- Group by task and meaning. Use panels for persistent tools, rows for comparable sensors, and dialogs for focused decisions.
+- Use consistent alignment and spacing; leave breathing room around meaningful groups while keeping a useful amount of data visible.
+- Make one primary action apparent within the current task. Read-only monitoring does not need a large call-to-action button.
+- Show units, freshness, and data origin close to the values they qualify.
+- Keep risk, connection health, and selection visually distinguishable.
+- Use subtle transitions to explain a user action. Live readings should not make the entire interface flash or move.
+
+### 7.3. Design tokens and component styling
+
+Define semantic CSS variables in one token file and use them in React, MapLibre styling, and the ECharts theme. These are initial design values; refine them through browser review while preserving their roles.
+
+| Token/role | Initial value | Usage |
+| --- | --- | --- |
+| Application background | `#F4F6F8` | Shell and quiet page background. |
+| Surface | `#FFFFFF` | Inspector, dialogs, menus, and table surface. |
+| Primary text | `#18212B` | Headings, primary readings, important labels. |
+| Secondary text | `#526172` | Supporting information and timestamps. |
+| Decorative separator | `#D5DDE5` | Low-emphasis grouping; not the sole boundary of an interactive control. |
+| Control boundary | `#788696` | Input outlines and controls where a visible boundary is necessary. |
+| Primary action | `#21604B` | Main buttons and selected navigation, with readable foregrounds. |
+| Selected surface | `#E4EFEB` | Quiet selected-row or selected-tab background. |
+| Focus indicator | `#246EA5` | Clear keyboard focus ring with offset. |
+| Warning | `#8A5200` on `#FFF4D6` | Stale data and caution messages, accompanied by text/icon. |
+| Critical | `#B42332` on `#FFF0F0` | Critical evidence and destructive actions, with explicit labels. |
+| Temperature series | `#A84B15` | Temperature chart line. |
+| Humidity series | `#246EA5` | Humidity chart line. |
+| Smoke series | `#586474` | Smoke-index chart line. |
+
+Use **IBM Plex Sans** for interface text and **IBM Plex Mono** only for device identifiers, coordinates, and code-like values [U4]. Use tabular numerals for changing measurements. Keep ordinary labels in the main sans-serif family. Self-host the required font files, retain their licence, and include Latin and Cyrillic glyph coverage for future Ukrainian text.
+
+Typography starting points: 14–16 px body text, 13 px secondary metadata, 18–20 px panel titles, and 24–28 px selected readings. Prefer weights 400, 500, and 600. Do not shrink essential labels to fit; reflow the layout. Use sentence case and short concrete labels.
+
+Use a 4 px spacing basis with an intentional scale of 4, 8, 12, 16, 24, and 32 px. Default control heights are 36–40 px on desktop and at least 44 px for primary touch controls. Use roughly 6 px control corners and 10 px dialog corners. Main map/sidebar boundaries can remain square. Shadows belong mainly to floating overlays and dialogs.
+
+Use Radix Primitives for dialog, menu, popover, tabs, tooltip, and slider behaviour, then style them with the shared tokens [U3]. Prefer CSS Modules for component-specific styling and a small global reset. Keep one icon family, a consistent stroke weight, and textual labels for unfamiliar actions. A component library does not replace the design decisions in this section.
+
+Treat a dark theme as a later deliberate design task; a complete, reviewed light theme is the initial requirement. Do not implement an automatic colour inversion and call it a finished second theme.
+
+### 7.4. Information architecture and screen ownership
+
+| Screen | Primary purpose | Main interaction |
+| --- | --- | --- |
+| Monitor | Understand current or historical conditions in a selected area. | Select a sensor/incident, inspect evidence, change time or layers. |
+| Sensors | Compare and administer device records. | Search/filter/sort; open a sensor; create or edit with administrator access. |
+| Incidents | Follow suspected and confirmed events and their evidence. | Inspect the timeline and contributing observations; acknowledge/confirm as administrator. |
+| Simulations | Configure, run, and compare saved scenarios. | Place devices/ignitions, control time, compare truth and estimate. |
+| Sources and model | Understand freshness, provenance, resolution, and model status. | Inspect current inputs, missing data, and prediction limitations. |
+| Settings | Configure credentials, retention, providers, and defaults. | Administrator-only forms with clear save feedback. |
+
+Keep the active area, data context, selected sensor, filters, and time understandable while moving between views. Preserve meaningful navigation state in the URL so Back/Forward and a copied read-only link behave predictably. Never put credentials in that URL.
+
+The application has an explicit **Live**, **History**, or **Simulation** context. Selecting a future timestamp additionally shows **Forecast** and the forecast issue time. A historical or simulated display must never retain an unqualified Live badge.
+
+### 7.5. Desktop layout and responsive composition
+
+For a large desktop, use a compact top bar, narrow navigation rail, sensor/incident list on the left, central map, optional right inspector, and a bottom time bar. The top bar carries the area, context, connection summary, and account control. Navigation labels must be available on focus and in the expanded navigation.
+
+| Region | Initial sizing | Behaviour |
+| --- | --- | --- |
+| Top bar | About 56 px high | Remains stable when values update; wraps or simplifies at smaller widths. |
+| Navigation rail | About 64 px wide | A small number of destinations; expands into a labelled menu. |
+| Left list | About 288–320 px wide | Search, compact status counts, filters, and sensor/incident rows. |
+| Map | Remaining space | The largest surface when the inspector is closed; protect a useful minimum width. |
+| Right inspector | About 380–420 px wide | Opens for a selected sensor/incident; scrolls internally when needed. |
+| Time bar | About 80–96 px collapsed | Expands for event tracks and detailed playback controls. |
+
+At 1440 px and wider, the list and inspector may coexist. At 1024–1439 px, show one full side panel at a time when both would squeeze the map below roughly 560 px. Opening the inspector preserves the list state and provides a clear return action.
+
+At 768–1023 px, use an overlay drawer or bottom inspector and a collapsible list. At mobile widths, the map is the base screen and Map/List is an explicit switch; the inspector becomes a bottom sheet or full-height panel. The sheet must have buttons to expand/close, not require dragging. Preserve numeric coordinate entry and the complete administrator flow on touch screens.
+
+Test 1440×900, 1280×800, 768×1024, and 390×844, plus 320 CSS px reflow and 200% zoom. Do not create horizontal page scrolling. If a data table needs horizontal scrolling, contain it within a labelled region. Keep the timeline and selected status accessible with the on-screen keyboard open.
+
+### 7.6. Map composition, layers, and interaction
 
 The default screen is a monitoring dashboard: map, sensor list, status counts, timeline, and collapsible layer controls. An administrator can open a Simulation workspace in the same application.
 
@@ -224,7 +334,43 @@ Map layers:
 
 Wind and temperature overlays must use the selected timeline time and environmental snapshot. Label their source resolution and freshness; visually smooth interpolation is not new measurement precision.
 
+Use a quiet basemap with readable place names, subdued roads, and restrained vegetation colours. Keep attribution, scale, and legend visible. Sensor hit areas may be larger than their drawn symbols. Dense or overlapping sensors need an explicit disambiguation list or expansion behaviour; clicking must not select an arbitrary hidden marker.
+
+Use marker shape/outline to distinguish real and simulated devices, an inner status glyph to indicate an alert, and a separate selection ring. Critical state must remain recognizable on top of a red probability region. Keep the selected sensor identifiable even while it receives new values.
+
+Interaction rules:
+
+- A marker or list-row click opens the same inspector and synchronizes selection.
+- Preserve the current zoom and view unless the user chooses Locate, Fit area, or Follow selected sensor. Automatic updates must not repeatedly pan the map.
+- When opening an inspector, pan only as needed to keep the selected marker in the usable map area; account for panel padding.
+- Show one small hover/focus preview with name, readings, and freshness. Place detailed graphs in the persistent inspector, not in a tiny map popup.
+- Use a deliberate placement/edit mode for administrator changes. A normal click on the map must not create or move anything.
+- Layer controls show visibility, opacity where meaningful, time, and an accessible legend. Group them as Sensors, Fire, Weather, and Landscape.
+- Temperature and fire probability are mutually exclusive filled rasters by default to avoid ambiguous colours. Allow deliberate comparison through switching or synchronized views. Wind arrows can sit above either layer without overwhelming markers.
+- Distinguish predicted boundaries, satellite detections, and simulated truth by line/symbol treatment as well as colour. Truth comparison is off by default in monitoring.
+- When tiles fail, preserve the sensor list, coordinate readout, and available overlays. Show a useful map error rather than a blank application.
+
+### 7.7. Sensor inspector and chart design
+
 Clicking a sensor opens a panel with current values, last communication, source, location, quality flags, calibration, and three synchronized charts: temperature, humidity, and smoke index. Show detected alarm events, weather baseline where available, and gaps rather than fabricated connecting values. Support ranges such as 1 hour, 24 hours, 7 days, and a custom interval.
+
+Inspector order:
+
+1. Device name and ID, real/simulated label, connection health, and close/locate actions.
+2. Three aligned values with units, observation time, and freshness. Keep units visually secondary but readable.
+3. A concise alert/evidence explanation when relevant.
+4. Date-range controls and the three synchronized charts.
+5. An event list and collapsible metadata/calibration details. Administrator edit actions stay in a consistent location.
+
+Use three vertically aligned plots with a shared time axis; do not combine Celsius and two percentages on an unexplained multi-axis graph. Humidity and smoke use 0–100% scales. The temperature plot can autoscale with visible limits and explicit threshold annotations. A weather baseline uses a labelled dashed line; projected values are dashed or shaded and clearly separated from observations.
+
+Use one measurement colour consistently across value, line, tooltip, and legend. Draw chart gridlines lightly, keep axes readable, and show units. Hover, keyboard inspection, and touch inspection should reveal the same timestamp and values across all three plots. Tooltips must remain inside the visible panel.
+
+Decimation must preserve peaks and gaps. Show the selected aggregation interval and retained sample count when a long range is summarized. Do not smooth away a brief critical reading. A chart with no data must explain whether the period is empty, the device has not reported, or data could not be loaded.
+
+Live follow is enabled for the latest time range. Panning or zooming a chart pauses follow and exposes a clear Resume live action. Do not jump the chart back to now while the user is examining an earlier event.
+
+### 7.8. Sensor list, filters, and information density
 
 Use one shared filter model for map markers and the TanStack Table sensor list [T6]:
 
@@ -234,7 +380,141 @@ Use one shared filter model for map markers and the TanStack Table sensor list [
 - Land-cover category, time window, and evidence-quality flags.
 - Clear all, visible matching count, and URL-persisted non-sensitive filters.
 
+A compact list row shows name, status, three aligned readings, and last-seen age. Show a small set of high-value filters directly; place advanced ranges and metadata in a Filters panel with an active-filter count. Active filters appear as removable chips with an obvious Clear all action.
+
+Use stable sorting while the user is interacting. Do not reorder the list on every incoming value and move a row out from under the pointer. If an active dynamic sort has changed substantially, provide a controlled refresh or reorder at a safe interaction boundary.
+
+Display contextual counts, such as 8 of 30 sensors, and distinguish No sensors configured from No sensors match these filters. A filtered-out selected device remains in the inspector with an explanation and a Show in list action.
+
+Keep table headings visible within the table region. Right-align comparable numerical readings and use tabular numerals. Preserve full IDs and names through accessible details rather than relying on hover-only truncation. Thirty devices do not require an elaborate virtualized interface unless measured performance justifies it.
+
+### 7.9. Timeline and playback UX
+
+The time bar contains a readable date/time and time zone, play/pause where applicable, step controls, a slider, playback speed for simulation, and Return to live. Context is visible even when the bar is collapsed.
+
+Use separate, labelled tracks for sensor alarms, ignition events, and available prediction frames. Differentiate recorded history from forecast time using a background boundary and a Now/Forecast start marker. Keep tick density appropriate for the current range.
+
+Dragging previews the selected timestamp promptly. Debounce expensive state requests, cancel obsolete requests, and apply only the response matching the current cursor/context. Preserve the previous complete frame with a Loading selected time indicator until the new frame is ready; do not assemble a map from mismatched times.
+
+All linked views must agree on the selected context and time: marker readings, chart cursor, weather layer, probability legend, and incident evidence. Historical data arriving over WebSocket may update the stored history, but must not yank the viewer back into live mode.
+
+Provide keyboard slider operation, a direct date/time input, and controls to jump to the previous/next event. State the current simulation speed plainly. The viewer's playback control must not unexpectedly pause or rewind another viewer's scenario run.
+
+### 7.10. Administrator and scenario workflows
+
+**Add a sensor:** choose real or simulated, enter the basic identifying fields, select a map location or enter coordinates, review a visible pending marker, and save. Show field labels and units persistently. After success, select the saved device and confirm it in the list. A failed save retains the entered information.
+
+**Move a sensor:** enter Edit location, show the original and proposed position, allow drag or coordinate entry, and provide Save location and Cancel. Ordinary navigation stays separate from editing. Cancel restores the original marker; Save failure does not falsely present the proposed position as persisted.
+
+**Archive or delete:** use explicit wording with the device name and the effect on history. Keep archive the convenient default for devices with readings. Permanent deletion requires the deliberate confirmation already specified in section 5. Do not use the same button appearance for Locate and Delete.
+
+**Create a scenario:** select an area, set its start time/environmental inputs, place simulated sensors, add ignition events, and run. Show these as meaningful stages, preserve drafts, and explain the next incomplete step. Advanced fuel and uncertainty settings live in expandable groups rather than blocking the basic setup.
+
+**Compare a scenario:** expose an explicit Truth and estimate comparison. Start with aligned layer switching; add synchronized split views only if space and interaction remain clear. Both views must share the same scenario revision and time.
+
+**Session expiry:** explain that editing requires login again, preserve the unsaved draft, and restore the intended form after successful login. Do not lose a user's entered coordinates or scenario settings.
+
+### 7.11. Alerts, failures, loading, and empty states
+
+Do not merge three separate facts into one badge: a device can be online, reporting an abnormal value, while the prediction worker is delayed. Present device connection, fire evidence, and forecast freshness separately.
+
+| State | Required presentation and recovery |
+| --- | --- |
+| First load | Stable panel/chart placeholders; show the application structure immediately. Avoid a full-screen spinner for unrelated requests. |
+| No devices configured | Short explanation and an administrator Add sensor action; viewers see a clear read-only message. |
+| No filter matches | Keep active filters visible and offer Clear filters. |
+| Device has never reported | Show Waiting for first reading; do not draw zero-valued charts. |
+| Stale device reading | Retain the last value with its timestamp and a stale label. |
+| WebSocket reconnecting | Quiet persistent connection status and last update; continue showing retained data. |
+| Weather unavailable | Show cached-data age or an unavailable state; explain which forecast inputs are affected. |
+| Analysis running/late | Keep the previous result with its issue time and an Updating indicator; allow cancellation of an explicit long job. |
+| Critical reading | Persistent in-app alert and incident entry with device, value, time, and an Inspect action. |
+| Save failed | Inline error near the affected form, preserved input, and a meaningful retry action. |
+| Map/WebGL unavailable | A functional sensor list, charts, and clear explanation of the unavailable map view. |
+| Permission denied | Clear explanation and login/return action without pretending the mutation succeeded. |
+
+Critical alerts must not disappear as short toasts. Acknowledging an alert records that it was seen; it does not clear measurements, stop the simulated fire, or confirm a real incident. Confirmation, acknowledgement, and resolution use distinct labels and events.
+
+Deduplicate repeated alerts from the same continuing condition. Avoid a new toast for every sensor tick. Audio notifications are off by default and are not required to recognize a critical state.
+
+Use concrete copy such as Last reading 8 minutes ago, Forecast updated 2 minutes ago, Changes could not be saved, and View incident. Avoid generic success messages that conceal what changed. Developer details such as API route names and worker implementation belong in diagnostics, not the primary operator flow.
+
+### 7.12. Accessibility and motion
+
 Provide numeric coordinate entry and a table-based selection alternative to map dragging. The timeline, dialogs, filters, and charts must be usable with a keyboard. Show textual statuses and patterns as well as colour.
+
+Target WCAG 2.2 AA for the application UI. Check actual rendered text/background combinations, aiming for at least 4.5:1 for normal text and 3:1 for large text; test meaningful graphical objects and control boundaries separately [U5]. Do not assume that a colour passing on white will pass over a map.
+
+Use a visible focus indicator that is not covered by sticky headers, drawers, or the timeline [U7]. Restore focus when a dialog closes. Ensure controls have accessible names, form errors are associated with fields, and selected/expanded states are conveyed programmatically.
+
+Use at least 24×24 CSS px targets or the relevant spacing accommodation, with approximately 44×44 px touch targets as the product preference [U6]. Map markers may use transparent hit areas, with an alternative list for densely packed devices.
+
+Use polite live announcements for important status changes, not for every incoming measurement. Expose chart values and event history through accessible text/table alternatives. Hover-only tooltips are insufficient.
+
+Use restrained CSS transitions, approximately 120–180 ms for controls and 180–240 ms for panels. Respect `prefers-reduced-motion`; disable particle wind animation and unnecessary transition movement when requested. Never use flashing or perpetual pulsing as the only alarm signal.
+
+### 7.13. Frontend implementation boundaries
+
+Keep the UI modular around product behaviour:
+
+| Module/component family | Responsibility |
+| --- | --- |
+| `AppShell`, `AreaSwitcher`, `ContextHeader` | Navigation, responsive composition, area/context/time identity. |
+| `MonitoringMap`, `LayerControls`, `MapLegend` | Map lifecycle, layers, marker interaction, and fixed semantic scales. |
+| `SensorList`, `SensorFilters`, `SensorInspector` | Shared selection/filter state and device evidence. |
+| `TelemetryCharts`, `RangePicker`, `ReadingSummary` | Synchronized historical and current measurements. |
+| `TimeController`, `EventTrack`, `PlaybackControls` | Viewer cursor, history/forecast separation, scenario playback. |
+| `IncidentPanel`, `ConnectionStatus`, `SourceStatus` | Incident evidence and independent freshness/health states. |
+| `SensorEditor`, `LocationEditor`, `ScenarioEditor` | Validated drafts, explicit mutations, and recoverable failures. |
+| Shared UI primitives | Buttons, fields, menus, dialogs, badges, tooltips, and consistent focus/error states. |
+
+Use TanStack Query for server-owned resources and keep transient view state separate: selected sensor, open panel, map camera, filters, and time cursor. One shared controller owns the selected time/context; components must not invent their own independent current time.
+
+Keep the MapLibre instance mounted during ordinary telemetry updates. Update source data and relevant layers instead of rebuilding the map. Patch only affected sensor state, clean up subscriptions, and batch visible updates so WebSocket traffic does not rerender every chart and panel.
+
+Cancel stale history/prediction queries. A late response for sensor A must not replace the inspector after the user has selected sensor B. Use request keys containing sensor/context/time/revision as appropriate.
+
+Persist harmless viewing preferences, such as layer choice and panel size, locally. Keep authentication secrets out of client persistence. Default to confirmed server responses for important mutations; if optimistic UI is used, implement visible rollback and error recovery.
+
+### 7.14. Design deliverables and review gates
+
+Frontend implementation must produce:
+
+- `docs/DESIGN_REFERENCES.md`: selected skill source/revision, a small set of reference principles, font/icon licences, and reasons for the visual direction.
+- Shared CSS design tokens, a chart theme, and matching map-layer style definitions.
+- A component-state gallery covering buttons, fields, statuses, dialogs, empty/error states, and keyboard focus. It may be a development-only route; a separate component service is not required.
+- Browser captures of monitoring overview, selected sensor, critical incident, historical replay, scenario editing, and mobile inspection using deterministic fixtures.
+- `docs/UX_REVIEW.md`: reviewed viewports, completed user journeys, discovered issues and fixes, accessibility checks, and outstanding limitations.
+
+Review each screen with the following questions:
+
+1. Can an operator identify the area, time, live/history/simulation context, and data freshness without opening settings?
+2. Is the most relevant observation easy to find, with units and a clear next action?
+3. Is the map usable after a panel opens, and can the selected device still be located?
+4. Do typography, spacing, controls, charts, and map symbols follow one coherent system?
+5. Are uncertainty, missing values, stale data, and forecasts visibly distinguishable?
+6. Does every visible control work, including cancellation, failure recovery, keyboard operation, and mobile interaction?
+
+Rate hierarchy, composition, consistency, readability, interaction clarity, and responsive behaviour from 0 to 4 during review. Each category must reach at least 3 before frontend sign-off, with no blocking usability or accessibility defects. This is a structured internal critique, not a claim that visual quality can be proven by an automated score.
+
+### 7.15. Visual and usability acceptance scenarios
+
+Use realistic deterministic fixtures: a 30-device overview with normal, stale, offline, missing, and critical states; long names and IDs; zero and 100% smoke; high temperature; absent weather; and an active filter. Keep sample data clearly identified.
+
+Required browser journeys:
+
+- Open monitoring, find a named device, inspect all three measurements, and return to the overview without losing the map position.
+- Open a critical incident, identify contributing sensors and timestamps, then acknowledge it as administrator without removing the evidence.
+- Add a sensor, cancel a location change, save a different location, reload, and verify the correct persisted position and feedback.
+- Apply several filters, select a device, change a filter so it no longer matches, and recover through the inspector's Show in list action.
+- Scrub into history while real packets continue to arrive; verify the display remains consistently historical until Return to live is used.
+- Run a scenario, change playback speed, seek backward, and compare truth and estimate at the same timestamp.
+- Interrupt WebSocket/network access, inspect retained data and reconnect status, restore access, and verify recovery without duplicate alerts or context loss.
+- Repeat the main monitoring and editing flows with keyboard-only input and on a touch-sized viewport.
+
+Use Playwright screenshot comparisons for stable, reviewed states [U8]. Freeze time, seed data, use fixed map fixtures/camera, wait for fonts and chart rendering, and disable nonessential animations in those tests. Run comparisons in a consistent browser/OS environment. Do not mask the sensor markers, probability layer, or key controls to make a defective screenshot pass.
+
+Inspect the first screenshot baselines manually. A screenshot matching an unreviewed baseline does not establish professional design. Update baselines only after checking the actual visual change and preserving the behavioural tests.
 
 ## 8. Deterministic simulation and time controls
 
@@ -488,6 +768,7 @@ Write tests around observable behaviour and scientific invariants. A passing bro
 | ML | Reproducible preprocessing, matching train/inference units, event/geographic split checks, model load, calibration metadata, baseline comparison, unavailable/out-of-domain fallback. |
 | Deployment | Fresh install, repeated install, database persistence, worker crash/restart, service reboot startup, static SPA routing, port binding, backup and restore. |
 | Usability | Keyboard navigation, visible focus, accessible dialogs, colour-independent statuses, desktop and narrow-screen layouts, no unexpected browser errors. |
+| Visual quality | Section 7 token consistency, reviewed desktop/mobile screenshots, readable map overlays, stable panel composition, complete loading/error/empty states, and recorded UX review. |
 
 Use Playwright against the built React app and actual Express server, with a real test PostgreSQL instance. Mock external weather/map/satellite responses for deterministic CI; do not mock internal telemetry, authentication, persistence, or WebSocket delivery in the main E2E path. Keep an opt-in live-provider smoke test separate [T10].
 
@@ -500,19 +781,20 @@ Complete all milestones for the requested product. The ordering provides reviewa
 | Milestone | Work | Completion evidence |
 | --- | --- | --- |
 | M0 — Contracts and research | Finalize source adapters, units, API schema, temporal semantics, source manifest, and known modelling assumptions. | OpenAPI draft, sample packets, source documentation, and reproducible sample scenario specification. |
+| M0D — Frontend design foundation | Read the selected frontend-design skill and section 7; define tokens, screen composition, representative states, and a realistic fixture. | Design references, a rendered monitoring composition, selected-sensor/alert/mobile states, and an initial visual critique before broad UI implementation. |
 | M1 — Application foundation | Workspace, Express/static React, Postgres/PostGIS, migrations, login, config, health checks. | Fresh local startup and protected mutation integration tests. |
 | M2 — Real sensor workflow | Sensor CRUD, location history, ingestion, credentials, durable outbox, live delivery, history. | A packet sent to the new API persists and updates the browser; unauthorized writes fail. |
-| M3 — Monitoring interface | Map, list, all three charts, filters, status/incident UI, responsive layout. | Playwright monitoring and CRUD journeys pass. |
+| M3 — Monitoring interface | Implement the section 7 design system and UX flows: map, list, all three charts, filters, status/incident UI, responsive composition, and interaction states. | Playwright monitoring/CRUD journeys, reviewed browser screenshots, keyboard/touch checks, and consistent map/chart/control styling. |
 | M4 — Environmental inputs | Weather/current/archive adapters, land cover, elevation, OSM enrichment, caches, optional overlays. | Source provenance visible; recorded fixtures and provider failure tests pass. |
 | M5 — Simulation | Surface-fire engine, synthetic sensors, multiple ignitions, deterministic clock, replay/checkpoints. | Seeded scenario reproduces gradual sensor response and is stable under seeking. |
 | M6 — Inference | Detection features, candidate origins, ensemble correction, uncertainty, probability layers. | Blind synthetic tests demonstrate localization updates without ground-truth leakage. |
 | M7 — Satellite history and ML | FIRMS integration, coverage-aware dataset pipeline, small TensorFlow model, evaluation, export, scale-matched combination. | Real historical benchmark results, model card, trained artifact, and documented domain/fallback. |
-| M8 — End-to-end quality | Full E2E flows, failure cases, visual/accessibility checks, load and resource measurements. | Test report with pass/fail details and measured performance. |
+| M8 — End-to-end quality | Full E2E flows, failure cases, section 7 visual/usability review, accessibility checks, load and resource measurements. | Test report, reviewed visual baselines, UX_REVIEW.md, and measured performance; no unresolved blocking interaction defects. |
 | M9 — Ubuntu delivery | Install/start scripts, Compose, services, firewall handling, backup/restore, operational README. | Clean Ubuntu installation and deployment smoke tests; unresolved external prerequisites stated explicitly. |
 
 Expected package boundaries are `apps/web`, `apps/server`, `packages/contracts`, `packages/simulation`, `packages/inference`, and `packages/data-sources`, plus `db`, `scripts`, `deploy`, `tests`, and `docs`. Keep simulation and inference usable without a browser or HTTP server.
 
-At completion, deliver the implementation, lockfiles, migrations, administrator/device setup instructions, API documentation, reproducible scenarios, trained-model or explicitly documented training prerequisites, scientific assumptions, citations, E2E results, benchmark results, and Ubuntu deployment instructions. Never label missing data access, unexecuted tests, or an untrained model as completed work.
+At completion, deliver the implementation, lockfiles, migrations, administrator/device setup instructions, API documentation, reproducible scenarios, trained-model or explicitly documented training prerequisites, scientific assumptions, citations, design tokens and references, reviewed UI states and UX findings, E2E results, benchmark results, and Ubuntu deployment instructions. Never label missing data access, unexecuted tests, an unreviewed interface, or an untrained model as completed work.
 
 ## 16. Source references
 
@@ -551,3 +833,14 @@ These references support data selection and modelling decisions. Engineering def
 - **[T8] Docker.** [Ubuntu installation](https://docs.docker.com/engine/install/ubuntu/).
 - **[T9] systemd.** [Service unit documentation](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html).
 - **[T10] Playwright.** [Test configuration](https://playwright.dev/docs/test-configuration).
+
+### Frontend and UX references
+
+- **[U1] Anthropic, frontend-design skill.** [Official SKILL.md](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md) · [Upstream licence](https://github.com/anthropics/skills/blob/main/skills/frontend-design/LICENSE.txt). Selected for its subject-specific design process and visual critique; the Dryspell requirements in section 7 remain authoritative for this project.
+- **[U2] IBM Carbon Design System.** [Data visualization guidance](https://www.carbondesignsystem.com/building-blocks/data-visualization/overview). Reference for information hierarchy and chart presentation, not a requirement to copy its visual identity or replace ECharts.
+- **[U3] Radix Primitives.** [Introduction and interaction foundations](https://www.radix-ui.com/primitives/docs/overview/introduction).
+- **[U4] IBM Plex.** [Official typeface repository and licence](https://github.com/IBM/plex).
+- **[U5] W3C WAI.** [Understanding contrast requirements](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
+- **[U6] W3C WAI.** [Understanding target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
+- **[U7] W3C WAI.** [Understanding focus not obscured](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html).
+- **[U8] Playwright.** [Visual comparisons and screenshot baselines](https://playwright.dev/docs/test-snapshots).
