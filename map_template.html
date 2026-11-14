@@ -98,6 +98,11 @@ td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
 .device i { width:10px; height:10px; flex:none; background:#2563eb; border:1.5px solid #fff; outline:1px solid #2563eb; }
 .device div { min-width:0; flex:1; cursor:pointer; }
 .device small { display:block; color:var(--muted); font-size:12px; }
+.device { align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); }
+.device small, #iotMessage { overflow-wrap:anywhere; }
+.sensor-reading { font-size:20px; font-variant-numeric:tabular-nums; }
+#iotConnection { margin:6px 0; }
+#iotMessage { color:#fbbf24; }
 .device button { border:0; background:none; color:var(--muted); font:inherit; cursor:pointer; padding:2px 6px; border-radius:4px; }
 .device button:hover { background:var(--hover); color:var(--fg); }
 body.picking .leaflet-container { cursor:crosshair; }
@@ -156,6 +161,26 @@ body:not(.dark) .spread-key { color:#6d28d9; }
 .spread-canvas { position:absolute; pointer-events:none; }
 .spread-unavailable { color:var(--hot); }
 
+.history-panel { position:absolute; z-index:1000; left:12px; top:12px; width:min(470px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:16px; box-sizing:border-box; }
+.history-panel[hidden] { display:none; }
+#panel[hidden] { display:none; }
+.history-panel h2 { margin:0 0 12px; }
+.history-fields { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:12px 0; }
+.history-fields label { display:grid; gap:4px; font-size:12px; color:var(--muted); }
+.history-fields select,.history-fields input { min-width:0; width:100%; box-sizing:border-box; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:6px; }
+.history-calendar { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:12px 0; }
+.history-month { color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:8px 3px; cursor:pointer; text-align:center; }
+.history-month span { display:block; font-size:11px; margin-bottom:4px; }
+.history-month strong { font-size:15px; }
+.history-month[aria-pressed=true] { outline:2px solid #c084fc; outline-offset:1px; }
+.history-month.missing { background:repeating-linear-gradient(135deg,transparent,transparent 5px,#8882 5px,#8882 7px) !important; }
+.history-panel table { width:100%; margin:10px 0; font-size:12px; }
+.history-panel td { padding:4px 0; }
+.history-panel td:last-child { text-align:right; }
+.history-panel .spread-actions { flex-wrap:wrap; margin:10px 0; }
+.history-notice { padding:8px; border-left:3px solid #fbbf24; background:#fbbf2410; font-size:12px; margin:10px 0; }
+@media(max-width:640px) { .history-panel { top:auto; bottom:8px; left:8px; width:calc(100vw - 16px); max-height:58vh; padding:12px; } }
+@media(max-width:640px) { .history-view .panel.right { top:8px; } }
 </style></head>
 <body class="dark">
 <div id="map"></div>
@@ -171,6 +196,8 @@ body:not(.dark) .spread-key { color:#6d28d9; }
       <div><b class="num" id="sExp">–</b> cells expected to have fire</div>
       <div class="hint"><span class="num" id="sCells">–</span> squares shown, each about <span id="km"></span> km wide</div>
       <div class="spread-actions" style="margin-top:8px"><button class="btn" id="view-ireland">Ireland</button><button class="btn" id="view-world">World</button></div>
+      <button class="btn" id="history-open" style="margin-top:8px" disabled>Fire history &amp; calendar</button>
+      <button class="btn" id="simulation-open" style="margin-top:8px">Ireland fire simulation</button>
     </section>
 
     <section>
@@ -241,18 +268,25 @@ body:not(.dark) .spread-key { color:#6d28d9; }
   </div>
   <div class="body">
     <section>
-      <div class="hint">Preview. Sensors are saved in this browser only and do not send data yet.</div>
+      <h2>Live connection</h2>
+      <div class="form">
+        <label for="iotEndpoint">Controller server (WebSocket)</label>
+        <input type="text" id="iotEndpoint" value="ws://51.68.199.185:2500/ws" placeholder="wss://your-controller-server/ws" spellcheck="false" autocomplete="off">
+        <div><button class="btn primary" id="iotConnect">Connect</button> <button class="btn" id="iotDisconnect" disabled>Disconnect</button></div>
+      </div>
+      <div id="iotConnection" role="status">Not connected</div>
+      <div id="iotMessage" class="hint" role="status"></div>
+      <div class="hint">Live temperature observations. Forecast probabilities stay separate. Readings become stale after 2 minutes. Controller locations are saved in this browser.</div>
     </section>
     <section>
-      <h2>Add a sensor</h2>
+      <h2>Add a controller</h2>
       <div class="form">
+        <input type="text" id="iotDeviceId" placeholder="Device ID, e.g. esp32-01" maxlength="80" aria-label="Controller device ID" spellcheck="false">
         <input type="text" id="iotName" placeholder="Name, e.g. North ridge" maxlength="40" aria-label="Sensor name">
-        <select id="iotType" aria-label="Sensor type">
-          <option>Temperature and humidity</option><option>Smoke</option><option>Camera</option><option>Weather station</option>
-        </select>
+        <div class="hint">Temperature sensor · °C</div>
         <button class="btn" id="iotPick">Choose place on the map</button>
         <div class="hint" id="iotPlace">No place chosen</div>
-        <button class="btn primary" id="iotAdd" disabled>Add sensor</button>
+        <button class="btn primary" id="iotAdd" disabled>Add controller</button>
       </div>
     </section>
     <section>
@@ -502,6 +536,7 @@ function applyOverlays() {
 
 // ---- popups & hover -----------------------------------------------------------------
 function cellAt(latlng) {
+  if (window.FireHistory?.isActive() || window.FireSimulation?.isActive()) return -1;
   const ll = latlng.wrap();
   const i = lookup.get(Math.floor((ll.lat + 90) / RES) * NX + Math.floor((ll.lng + 180) / RES));
   return i !== undefined && eligibleP(i, pAt(i)) ? i : -1;
@@ -529,7 +564,7 @@ function popupHtml(i, k) {
     ${FR[i] ? '<div class="pop-new">New fire area: nothing burned within about 100 km in the last 7 days.</div>' : ''}`;
 }
 map.on('mousemove', e => {
-  const i = picking() ? -1 : cellAt(e.latlng);
+  const i = (typeof picking === 'function' && picking()) ? -1 : cellAt(e.latlng);
   map.getContainer().classList.toggle('over-cell', i >= 0);
   if (i < 0) { map.removeLayer(hl); return; }
   hl.setBounds(boundsOf(i, e.latlng.lng)).addTo(map);
@@ -595,61 +630,7 @@ function frame(now) {
 }
 map.on('move zoom resize', () => { dirty = true; });
 
-// ---- ground sensors (placeholder: stored in this browser, no live data) --------------
-let devices = [];
-try { devices = JSON.parse(localStorage.getItem('wildfireSensors') || '[]'); } catch (e) {}
-const ESC = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'};
-const esc = s => String(s).replace(/[&<>"]/g, ch => ESC[ch]);
-const place = d => `${Math.abs(d.lat).toFixed(3)}°${d.lat >= 0 ? 'N' : 'S'} ${Math.abs(d.lon).toFixed(3)}°${d.lon >= 0 ? 'E' : 'W'}`;
-map.createPane('sensors').style.zIndex = 620;
-const sensorGroup = L.featureGroup().addTo(map);
-const sensorIcon = L.divIcon({className: '', iconSize: [14, 14],
-  html: '<div style="width:12px;height:12px;background:#2563eb;border:2px solid #fff;box-shadow:0 0 0 1px #2563eb"></div>'});
-let picked = null, pickMarker = null;
-function picking() { return document.body.classList.contains('picking'); }
-function setPicking(on) {
-  document.body.classList.toggle('picking', on);
-  $('iotPick').classList.toggle('picking', on);
-  $('iotPick').textContent = on ? 'Click the map…' : 'Choose place on the map';
-}
-function renderSensors() {
-  try { localStorage.setItem('wildfireSensors', JSON.stringify(devices)); } catch (e) {}
-  sensorGroup.clearLayers();
-  devices.forEach(d => L.marker([d.lat, d.lon], {icon: sensorIcon, pane: 'sensors'}).addTo(sensorGroup)
-    .bindPopup(`<b>${esc(d.name)}</b><div class="pop-place">${esc(d.type)}, ${place(d)}</div>No data yet: live connection is not available.`));
-  $('iotCount').textContent = devices.length ? `${devices.length} added` : 'None added';
-  $('iotList').innerHTML = devices.map((d, k) =>
-    `<div class="device"><i></i><div data-k="${k}" title="Show on the map">${esc(d.name)}<small>${esc(d.type)}, ${place(d)}</small></div>` +
-    `<button data-k="${k}" aria-label="Remove ${esc(d.name)}">Remove</button></div>`).join('') ||
-    '<div class="hint">No sensors yet.</div>';
-  $('iotList').querySelectorAll('.device div').forEach(el => el.onclick = () => {
-    const d = devices[+el.dataset.k]; map.flyTo([d.lat, d.lon], Math.max(map.getZoom(), 7), {duration: 0.8}); });
-  $('iotList').querySelectorAll('.device button').forEach(el => el.onclick = () => { devices.splice(+el.dataset.k, 1); renderSensors(); });
-}
-$('iotPick').onclick = () => setPicking(!picking());
-map.on('click', e => {
-  if (picking()) {
-    const ll = e.latlng.wrap();
-    picked = {lat: +ll.lat.toFixed(4), lon: +ll.lng.toFixed(4)};
-    if (pickMarker) map.removeLayer(pickMarker);
-    pickMarker = L.circleMarker([picked.lat, picked.lon], {radius: 7, color: '#2563eb', weight: 2, fillOpacity: 0, interactive: false, pane: 'sensors'}).addTo(map);
-    $('iotPlace').textContent = place(picked);
-    $('iotAdd').disabled = false;
-    setPicking(false);
-    return;
-  }
-  const i = cellAt(e.latlng);
-  if (i < 0) return;
-  popCell = i;
-  popup = L.popup({maxWidth: 290}).setLatLng(e.latlng).setContent(popupHtml(i, dayNow())).openOn(map);
-});
-$('iotAdd').onclick = () => {
-  if (!picked) return;
-  devices.push({name: $('iotName').value.trim() || `Sensor ${devices.length + 1}`, type: $('iotType').value, ...picked});
-  picked = null; if (pickMarker) { map.removeLayer(pickMarker); pickMarker = null; }
-  $('iotName').value = ''; $('iotPlace').textContent = 'No place chosen'; $('iotAdd').disabled = true;
-  renderSensors();
-};
+/*__SENSOR_CODE__*/
 
 // ---- wiring -------------------------------------------------------------------------
 function applyOpen() { $('panel').classList.toggle('closed', !state.open); $('collapse').textContent = state.open ? '−' : '+'; }
@@ -673,7 +654,7 @@ if (phone.matches && state.open && state.iotOpen) state.iotOpen = false;
 $('thr').value = state.step; $('op').value = state.opacity; $('base').value = state.base;
 $('classes').checked = state.mode === 'classes'; $('glow').checked = state.glow;
 $('fresh').checked = state.fresh; $('dets').checked = state.dets; $('borders').checked = state.borders;
-applyOpen(); applyIotOpen(); renderSensors();
+applyOpen(); applyIotOpen(); if (typeof renderSensors === 'function') renderSensors();
 $('valid').textContent = `${K}-day outlook, ${days[0].span.split(' →')[0]} UTC`;
 $('km').textContent = Math.round(RES * 111);
 $('nFresh').textContent = fmt(FR.reduce((a, b) => a + b, 0));
@@ -708,7 +689,7 @@ if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
   const dateLabel = value => new Date(value).toLocaleString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC';
   const escape = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function aligned() { return dataset() && dataset().metadata.issued_at_utc === META.days[0].from; }
-  function eligible() { return ui.enabled.checked && aligned() && dayNow()===0; }
+  function eligible() { return ui.enabled.checked && aligned() && dayNow()===0 && !window.FireHistory?.isActive() && !window.FireSimulation?.isActive(); }
   function project(coordinates) {
     const longitude = coordinates[0] + 360*Math.round((map.getCenter().lng-coordinates[0])/360);
     return map.latLngToContainerPoint([coordinates[1],longitude]);
@@ -813,6 +794,7 @@ if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
     if (!aligned()) {ui.status.textContent='Spread snapshot belongs to a different forecast time.';return;}
     if (dayNow()!==0) {ui.status.textContent='Spread is available for the first 24 hours only. Select the first forecast day.';return;}
     if (!ui.enabled.checked) {ui.status.textContent='Direction arrows hidden.';return;}
+    if (window.FireHistory?.isActive()) {ui.status.textContent='Hidden while viewing historical observations.';return;}
     const color=ui.kind.value==='wind' ? (theme()==='dark'?'#67e8f9':'#087e96') : (theme()==='dark'?'#d8b4fe':'#6d28d9');
     const occupied=new Set(); let candidates=0;
     const ordered=selected ? [selected,...data.features.filter(f=>f.id!==selected.id)] : data.features;
@@ -876,7 +858,7 @@ if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
   el('view-world').onclick=()=>map.setView([14,18],phone.matches?2:3);
   map.on('move zoom resize',requestDraw);window.addEventListener('spread-theme',requestDraw);
   map.on('click',event=>{
-    if(picking()||!eligible())return;
+    if((typeof picking === 'function' && picking())||!eligible())return;
     const point=map.latLngToContainerPoint(event.latlng);
     const hit=drawn.find(d=>Math.hypot(d.x-point.x,d.y-point.y)<=15);
     if(hit) {selectFeature(hit.feature.id);spreadPopup=L.popup({maxWidth:330}).setLatLng(event.latlng).setContent(detailHtml(hit.feature)).openOn(map);}
@@ -890,4 +872,23 @@ if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
 })();
 </script>
 
+<aside id="history-panel" class="history-panel" hidden aria-label="Historical fire activity">
+  <div style="display:flex;justify-content:space-between;gap:12px"><h2>Fire activity calendar</h2><button class="btn" id="history-close">Back to forecast</button></div>
+  <div class="hint">Two-year MODIS / VIIRS comparison. Historical observations, separate from the forecast.</div>
+  <div class="history-fields">
+    <label>Region<select id="history-country"></select></label>
+    <label>Display<select id="history-metric"><option value="viirs">VIIRS detected cell-days</option><option value="modis">MODIS detected cell-days</option><option value="adjusted">Adjusted VIIRS index (experimental)</option></select></label>
+    <label>From month<input id="history-from" type="month"></label><label>Through month<input id="history-to" type="month"></label>
+  </div>
+  <p id="history-status" class="hint" role="status" aria-live="polite"></p>
+  <div id="history-calendar" class="history-calendar" aria-label="Monthly fire activity"></div>
+  <div id="history-legend" class="hint"></div>
+  <div id="history-detail"></div>
+  <div class="spread-actions"><button class="btn" id="history-csv">Monthly CSV</button><button class="btn" id="history-points">VIIRS points CSV</button></div>
+  <div id="history-download-status" class="hint" role="status"></div>
+  <details><summary>Method, calibration &amp; limitations</summary><div id="history-method" class="hint"></div></details>
+</aside>
+<script type="application/json" id="history-payload">{}</script>
+<script id="history-code"></script>
+<script id="simulation-code"></script>
 </body></html>

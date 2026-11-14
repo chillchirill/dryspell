@@ -1,0 +1,21 @@
+{
+  "revision": "63061bc7e57d3e63b9d3a98102576fcd6a29d09b",
+  "sources": {
+    "engine.ts": {
+      "path": "webplatform/packages/simulation/src/index.ts",
+      "sha256": "b8c602ab2a3f1cb4938fe7a6973f6f2e616b8ceb69bca3f55048aa24e93b46dc"
+    },
+    "fuels.ts": {
+      "path": "webplatform/packages/simulation/src/fuels.ts",
+      "sha256": "8eb17a520d01398c083dae357a1fe9f457dfdd56112e5f332f1c8d826d9e1f69"
+    },
+    "contracts.ts": {
+      "path": "webplatform/packages/contracts/src/index.ts",
+      "sha256": "d95ed8e9dbcfe3dd1c8014d212033157f50efdc82dd26998f6b44f531bcba70b"
+    },
+    "environment.json.gz": {
+      "path": "webplatform/data/sandbox/environment.json",
+      "uncompressed_sha256": "c6592c620e34cbeaef6987c9bde8abb2f5a205d62477aca8b4cb4c7336548de9"
+    }
+  }
+}

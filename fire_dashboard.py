@@ -4,7 +4,7 @@ r"""Build/serve the partner's map with cached probability and spread forecasts.
   .venv\Scripts\python.exe fire_dashboard.py serve --port 8000
 
 No training, weather/FIRMS downloads, credentials, commits or deployment.
-The read-only server binds to 127.0.0.1 and exposes only the map and JSON APIs:
+The local server binds to 127.0.0.1 and serves the map, cached JSON and offline simulation:
   GET /api/forecast             columnar probability data + UTC day windows
   GET /api/spread?source=active GeoJSON, source=active|scenario|ireland|europe
   GET /api/status               available snapshots
@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
+import subprocess
 from types import SimpleNamespace
 from urllib.parse import urlsplit, parse_qs
 
@@ -182,11 +183,23 @@ def build(refresh=False):
             polys=[coords] if geometry['type']=='Polygon' else coords
             for polygon in polys: borders.append([[lat,lon] for lon,lat,*rest in polygon[0]])
     html=(ROOT/'map_template.html').read_text(encoding='utf-8')
+    telemetry_js=(ROOT/'scripts/fire_telemetry.js').read_text(encoding='utf-8')
+    sensors_js=(ROOT/'scripts/fire_sensors_ui.js').read_text(encoding='utf-8')
+    html=html.replace('/*__SENSOR_CODE__*/',telemetry_js+'\n'+sensors_js)
+    simulation_js=(ROOT/'scripts/fire_simulation_ui.js').read_text(encoding='utf-8')
+    html=html.replace('<script id="simulation-code"></script>', '<script id="simulation-code">'+simulation_js+'</script>')
     for token,value in {'__DATA__':payload['data'],'__PTS__':points,'__BORDERS__':borders,
                          '__META__':payload['metadata'],'__COLORS__':COLORS,'__RES__':.25}.items():
         html=html.replace(token,safe_json(value))
     html=html.replace('<script type="application/json" id="spread-payload">{}</script>',
                       '<script type="application/json" id="spread-payload">'+safe_json(snapshots)+'</script>')
+    history_path=ROOT/'output/history/history_latest.json'
+    if history_path.exists():
+        history=json.loads(history_path.read_text(encoding='utf-8'))
+        html=html.replace('<script type="application/json" id="history-payload">{}</script>',
+                          '<script type="application/json" id="history-payload">'+safe_json(history)+'</script>')
+        history_js=(ROOT/'scripts/fire_history_ui.js').read_text(encoding='utf-8')
+        html=html.replace('<script id="history-code"></script>','<script id="history-code">'+history_js+'</script>')
     temp=target.with_suffix('.html.part'); temp.write_text(html,encoding='utf-8'); temp.replace(target)
     atomic_json(out/'forecast_web.json',payload)
     print(f'Built {target}; probability cells={len(frame)}, forecast days={len(payload["data"]["p"])}, '
@@ -209,6 +222,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
             path=ROOT/'output/firms/forecast_map.html'; content_type='text/html; charset=utf-8'
         elif parts.path=='/api/forecast':
             path=ROOT/'output/firms/forecast_web.json'; content_type='application/json'
+        elif parts.path=='/api/simulation/environment':
+            from fire_simulation import environment
+            try:
+                return self.json_response(environment())
+            except FileNotFoundError:
+                return self.json_response({'error':'Prepared Ireland simulation is unavailable'},503)
+        elif parts.path=='/api/history':
+            path=ROOT/'output/history/history_latest.json'; content_type='application/json'
+        elif parts.path=='/api/history/detections':
+            from fire_history import detections_csv
+            query=parse_qs(parts.query)
+            try:
+                csv=detections_csv(ROOT/'output/history',query.get('country',[''])[0],
+                                   query.get('start',[''])[0],query.get('end',[''])[0])
+            except ValueError as error:
+                return self.json_response({'error':str(error)},400)
+            except FileNotFoundError:
+                return self.json_response({'error':'History package not built'},503)
+            data=csv.encode('utf-8')
+            self.send_response(200);self.send_header('Content-Type','text/csv; charset=utf-8')
+            self.send_header('Content-Disposition','attachment; filename="viirs_points.csv"')
+            self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)))
+            self.end_headers();self.wfile.write(data);return
         elif parts.path=='/api/spread':
             source=parse_qs(parts.query).get('source',['active'])[0]
             if source not in ['active','scenario','ireland','europe']:
@@ -226,6 +262,33 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200); self.send_header('Content-Type',content_type)
         self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff')
         data=path.read_bytes(); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
+
+    def do_POST(self):
+        if urlsplit(self.path).path != '/api/simulation/run':
+            return self.json_response({'error':'not found'},404)
+        origin=self.headers.get('Origin')
+        if (origin and origin != 'http://'+self.headers.get('Host','')) or self.headers.get('Sec-Fetch-Site')=='cross-site':
+            return self.json_response({'error':'Use the simulation from this dashboard'},403)
+        if self.headers.get('Content-Type','').split(';')[0]!='application/json':
+            return self.json_response({'error':'Expected application/json'},415)
+        try:
+            length=int(self.headers.get('Content-Length','0'))
+        except ValueError:
+            return self.json_response({'error':'Invalid request size'},400)
+        if not 0 < length <= 16384:
+            return self.json_response({'error':'Request must be at most 16 KB'},413)
+        from fire_simulation import run
+        try:
+            value=json.loads(self.rfile.read(length))
+            return self.json_response(run(value))
+        except (ValueError, UnicodeDecodeError) as error:
+            return self.json_response({'error':str(error)},400)
+        except BlockingIOError as error:
+            return self.json_response({'error':str(error)},429)
+        except FileNotFoundError:
+            return self.json_response({'error':'Simulation engine or Node is unavailable'},503)
+        except subprocess.TimeoutExpired:
+            return self.json_response({'error':'Calculation timed out; choose a shorter run'},504)
 
     def json_response(self,value,status=200):
         data=json.dumps(value,allow_nan=False).encode()

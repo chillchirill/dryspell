@@ -1,0 +1,6 @@
+# Preserve pinned upstream source bytes and their provenance hashes on Windows.
+*.ts text eol=lf whitespace=-blank-at-eof
+*.mjs text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.gz binary

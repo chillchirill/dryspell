@@ -10,7 +10,7 @@ const chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',[
   '--disable-background-networking','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'
 ],{windowsHide:true,stdio:'ignore'});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let socket;
+let socket, telemetryRelay;
 (async()=>{
   let port;
   for(let n=0;n<100;n++) {try {port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];break;}catch(e){await sleep(100);}}
@@ -31,6 +31,32 @@ let socket;
   await wait('typeof window.FireSpreadLayer !== "undefined" && window.FireSpreadLayer.getState().featureCount > 0');
   await sleep(1500);
   assert(await evaluate("(()=>{const original=D.tmax[0][0];D.tmax[0][0]=null;const html=popupHtml(0,0);D.tmax[0][0]=original;return html.includes('Max temperature</td><td>Not available');})()"),'Missing temperature must not appear as zero');
+  if(await evaluate('typeof window.FireHistory !== "undefined"')) {
+    await evaluate('document.getElementById("history-open").click()');await sleep(200);
+    assert.equal((await evaluate('window.FireHistory.getState()')).months,24);
+    assert.equal((await evaluate('window.FireSpreadLayer.getState()')).visibleArrows,0);
+    assert(await evaluate('getComputedStyle(document.getElementById("panel")).display === "none"'));
+    assert(await evaluate('getComputedStyle(pane).visibility === "hidden"'));
+    await select('history-metric','modis');
+    assert.equal((await evaluate('window.FireHistory.getState()')).visibleCells,0);
+    assert((await evaluate('document.getElementById("history-detail").textContent')).includes('It is not zero'));
+    await select('history-country','Spain');await select('history-from','2025-01');await select('history-to','2025-12');
+    await evaluate("document.querySelector('#history-calendar [data-month=\"2025-08\"]').click()");await sleep(200);
+    assert.equal((await evaluate('window.FireHistory.getState()')).months,12);
+    assert((await evaluate('window.FireHistory.getState()')).visibleCells>0);
+    await select('history-metric','adjusted');
+    assert((await evaluate('document.getElementById("history-method").textContent')).includes('not fire-prediction accuracy'));
+    await evaluate('window.__oldCreateURL=URL.createObjectURL;URL.createObjectURL=blob=>{window.__historyCSV=blob;return window.__oldCreateURL(blob)};document.getElementById("history-csv").click()');
+    const csv=await evaluate('window.__historyCSV.text()');assert.equal(csv.split('\r\n').length,13);assert(csv.includes('Spain'));assert(csv.includes('2025-08'));
+    await evaluate('URL.createObjectURL=window.__oldCreateURL');
+    const raw=await evaluate("fetch('/api/history/detections?country=Ireland&start=2025-01&end=2025-01').then(async r=>({status:r.status,text:await r.text()}))");
+    assert.equal(raw.status,200);assert(raw.text.includes('calendar_included'));assert(!raw.text.includes('Spain'));
+    const historyImage=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'history_desktop.png'),Buffer.from(historyImage.data,'base64'));
+    await evaluate('document.getElementById("history-close").click()');await sleep(250);
+    assert.equal((await evaluate('window.FireHistory.getState()')).active,false);
+    assert((await evaluate('window.FireSpreadLayer.getState()')).visibleArrows>0);
+    console.log('History desktop: 24 months; missing MODIS stays unavailable; filtered CSV and VIIRS points export passed');
+  }
   let state=await evaluate('window.FireSpreadLayer.getState()');
   assert.equal(state.source,'combined');assert(state.featureCount>3000);
   assert.equal(state.drawn.filter(d=>d.id.startsWith('ireland-')).length,7);
@@ -98,6 +124,40 @@ let socket;
   await evaluate('document.getElementById("spread-locate").click();document.getElementById("spread-section").scrollIntoView({block:"start"})');await sleep(1300);
   const image=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'desktop.png'),Buffer.from(image.data,'base64'));
   console.log('Desktop controls passed');
+  // Exercise actual HTTP -> WebSocket -> map delivery on a loopback fixture only.
+  telemetryRelay=await require('./telemetry_test_relay.cjs')();
+  const sensorBefore=await evaluate('JSON.stringify(D.p)');
+  await evaluate(`document.getElementById('iotEndpoint').value=${JSON.stringify(telemetryRelay.url)};
+    document.getElementById('iotDeviceId').value='qa-controller';
+    document.getElementById('iotName').value='QA temperature controller';
+    document.getElementById('iotPick').click();map.fire('click',{latlng:L.latLng(53.35,-6.26)});
+    document.getElementById('iotAdd').click();document.getElementById('iotConnect').click();`);
+  await wait('window.FireSensors.getState().connected');
+  const post=async body=>{const r=await fetch(telemetryRelay.http+'/api/esp32',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});assert.equal(r.status,200);};
+  const sampleTime=new Date().toISOString();
+  await post({deviceId:'qa-controller',temperatureC:23.4,recordedAt:sampleTime});
+  await wait('window.FireSensors.getState().devices[0]?.temperature === "23.4 °C"');
+  assert.equal((await evaluate('window.FireSensors.getState()')).devices[0].status,'Live');
+  assert.equal(await evaluate('(()=>{const clock=Date.now;try{Date.now=()=>clock()+180000;return window.FireSensors.getState().devices[0].status;}finally{Date.now=clock;}})()'),'Stale');
+  await post({deviceId:'other-controller',temperatureC:99});
+  await wait('document.getElementById("iotMessage").textContent.includes("Unlinked device")');
+  await post({deviceId:'qa-controller',temperatureC:10,recordedAt:'2020-01-01T00:00:00Z'});
+  await sleep(100);
+  assert.equal((await evaluate('window.FireSensors.getState()')).devices[0].temperature,'23.4 °C');
+  await post({deviceId:'qa-controller',temperatureC:null});
+  await wait('document.getElementById("iotMessage").textContent.includes("Missing temperature")');
+  assert.equal(await evaluate('JSON.stringify(D.p)'),sensorBefore,'Telemetry must not change ML probabilities');
+  await evaluate("if(document.getElementById('iot').classList.contains('closed'))document.getElementById('iotCollapse').click();document.getElementById('iotList').scrollIntoView({block:'end'})");
+  const sensorImage=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'sensors_desktop_qa.png'),Buffer.from(sensorImage.data,'base64'));
+  telemetryRelay.drop();
+  await wait('!window.FireSensors.getState().connected');
+  assert.equal((await evaluate('window.FireSensors.getState()')).devices[0].status,'Disconnected');
+  await wait('window.FireSensors.getState().connected');
+  await post({deviceId:'qa-controller',temperatureC:0});
+  await wait('window.FireSensors.getState().devices[0]?.temperature === "0.0 °C"');
+  await evaluate('document.getElementById("iotDisconnect").click()');
+  console.log('Telemetry fixture: HTTP -> WebSocket -> marker; zero Celsius, ID routing, invalid/old packets, disconnect and reconnect passed; forecast unchanged');
+  await require('./check_simulation_browser.cjs')({evaluate,wait,send,out});
   // Verify mismatched issue times do not overlay a different forecast snapshot.
   await evaluate(`window.__testOriginal=JSON.parse(document.getElementById('spread-payload').textContent).active;
     window.__testMismatch=structuredClone(window.__testOriginal);window.__testMismatch.metadata.issued_at_utc='2000-01-01T00:00:00Z';
@@ -117,6 +177,23 @@ let socket;
   assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'));
   assert.equal(errors.length,0,errors.join('\n'));
   console.log('Mobile controls:',await evaluate('window.FireSpreadLayer.getState()'));
+  if(await evaluate('typeof window.FireHistory !== "undefined"')) {
+    await evaluate('window.FireHistory.open()');await select('history-country','Spain');
+    await evaluate("document.querySelector('#history-calendar [data-month=\"2025-08\"]').click()");await sleep(300);
+    assert.equal((await evaluate('window.FireHistory.getState()')).month,'2025-08');
+    assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'));
+    assert(await evaluate('(()=>{const r=document.getElementById("history-panel").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight})()'));
+    const mobileHistory=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'history_mobile.png'),Buffer.from(mobileHistory.data,'base64'));
+    await evaluate('window.FireHistory.close()');await sleep(150);
+    assert((await evaluate('window.FireSpreadLayer.getState()')).visibleArrows>0);
+    console.log('History mobile layout and forecast return passed');
+  }
+  assert.equal(errors.length,0,errors.join('\n'));
+  await evaluate("if(document.getElementById('iot').classList.contains('closed'))document.getElementById('iotCollapse').click();document.getElementById('iotList').scrollIntoView({block:'end'})");
+  assert.equal((await evaluate('window.FireSensors.getState()')).devices[0].status,'Waiting for data','Reload must not restore a previous temperature as live');
+  assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
+  const sensorMobile=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'sensors_mobile_qa.png'),Buffer.from(sensorMobile.data,'base64'));
+  await require('./check_simulation_browser.cjs')({evaluate,wait,send,out,mobile:true});
   console.log('Browser checks passed; screenshots:',out);
   await send('Browser.close');
-})().catch(error=>{console.error(error.stack);process.exitCode=1;}).finally(()=>{if(socket)socket.close();chrome.kill();});
+})().catch(error=>{console.error(error.stack);process.exitCode=1;}).finally(()=>{telemetryRelay?.close();if(socket)socket.close();chrome.kill();});
