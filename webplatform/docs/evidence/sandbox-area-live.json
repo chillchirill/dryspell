@@ -1,0 +1,86 @@
+{
+  "checkedAt": "2026-11-14T14:20:19.732Z",
+  "providerMode": "Actual ESA, Copernicus and Open-Meteo through compiled Express; no fixtures",
+  "results": [
+    {
+      "label": "Carpathians",
+      "latitude": 48.4,
+      "longitude": 24.5,
+      "status": 200,
+      "elapsedMs": 8888.136400000001,
+      "id": "landscape-22d42dc0090a55bf6997d603:openmeteo-f9e96669cef557ab1e2b",
+      "landscapeId": "landscape-22d42dc0090a55bf6997d603",
+      "bounds": {
+        "west": 24.493234856842037,
+        "east": 24.506765143157963,
+        "south": 48.39550844412504,
+        "north": 48.404491555874955
+      },
+      "cellCount": 1600,
+      "cellSizeM": 25,
+      "classes": [
+        10,
+        30
+      ],
+      "minElevationM": 924.3,
+      "maxElevationM": 1428.6,
+      "burnable": 1600,
+      "checksum": "5cfa7e9ba0e3e13b610c79b341582a15f787acb32b967fd125e0c8e4d31e08a6",
+      "forecastEndSec": 52789.162,
+      "sources": [
+        {
+          "provider": "Copernicus DEM",
+          "sourceUrl": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N48_00_E024_00_DEM/Copernicus_DSM_COG_10_N48_00_E024_00_DEM.tif",
+          "checksum": "1296e5d26d5243b9f56b5cb1411bd9df17fc98ca8fbe28a58182350526b817fc"
+        },
+        {
+          "provider": "ESA WorldCover",
+          "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N48E024_Map.tif",
+          "checksum": "8c6c9451fbb4dcdc642b230c5b28951aa344586074555bc0157397ebfc8bede8"
+        }
+      ]
+    },
+    {
+      "label": "California",
+      "latitude": 38.5,
+      "longitude": -122.5,
+      "status": 200,
+      "elapsedMs": 7734.6260999999995,
+      "id": "landscape-d6902675a8507b24c010a9c5:openmeteo-d62bcfceb211e971d7ac",
+      "landscapeId": "landscape-d6902675a8507b24c010a9c5",
+      "bounds": {
+        "west": -122.50573921423592,
+        "east": -122.49426078576408,
+        "south": 38.49550844412504,
+        "north": 38.50449155587496
+      },
+      "cellCount": 1600,
+      "cellSizeM": 25,
+      "classes": [
+        10,
+        30,
+        40,
+        20,
+        60,
+        50
+      ],
+      "minElevationM": 137.5,
+      "maxElevationM": 375.3,
+      "burnable": 1592,
+      "checksum": "830997294c27f65b8a203e81ad847e3d32b060dbfa47ab23775fbf0f2f6fff3e",
+      "forecastEndSec": 52789.095,
+      "sources": [
+        {
+          "provider": "Copernicus DEM",
+          "sourceUrl": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W123_00_DEM/Copernicus_DSM_COG_10_N38_00_W123_00_DEM.tif",
+          "checksum": "9c48fc394e5b234dba3f501b6752ae5aa9e472e0c4030654ab1e8f3c0ffa54e9"
+        },
+        {
+          "provider": "ESA WorldCover",
+          "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N36W123_Map.tif",
+          "checksum": "a46ec31b473e8e8c555fe4bb699da5328a17670da3b5e3c2fbf7c0ffd9cd8e33"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+- main [ref=e3]:
+  - link "Skip to workspace tools" [ref=e4] [cursor=pointer]:
+    - /url: "#workspace-tools"
+  - heading "Dryspell geographic simulator" [level=1] [ref=e5]
+  - generic "Physical map. Use coordinate placement for keyboard access." [ref=e6]:
+    - region "Map" [ref=e7]
+    - generic:
+      - generic:
+        - generic [ref=e8]: 500 m
+        - generic [ref=e9]:
+          - button "Zoom in" [ref=e10] [cursor=pointer]
+          - button "Zoom out" [ref=e12] [cursor=pointer]
+          - button "Drag to rotate map, click to reset north" [ref=e14]
+      - group [ref=e16]:
+        - generic "Toggle attribution" [ref=e17] [cursor=pointer]
+        - generic [ref=e18]: Tiles © Esri, HERE, Garmin, USGS, NGA, EPA, NPS; map data © OpenStreetMap contributors
+  - generic [ref=e19]:
+    - button "Open workspace menu" [ref=e20] [cursor=pointer]:
+      - generic [aria-hidden] [ref=e21]: ◈
+      - generic [ref=e22]: Dryspell
+    - generic [ref=e24]:
+      - generic [ref=e25]: Workspace context
+      - combobox "Workspace context" [ref=e26]:
+        - option "Simulation" [selected]
+        - option "Live"
+        - option "History"
+    - button "Loading landscape… Revision — · loading" [ref=e27] [cursor=pointer]:
+      - text: Loading landscape…
+      - generic [ref=e28]: Revision — · loading
+  - button "Map layers" [ref=e30] [cursor=pointer]:
+    - generic [ref=e35]: Layers
+  - navigation "Object tools" [ref=e36]:
+    - button "Select objects" [pressed] [ref=e37] [cursor=pointer]:
+      - generic [ref=e40]: Select
+    - button "Add sensor" [disabled] [ref=e41]:
+      - generic [ref=e46]: Loading…
+    - button "Add ignition" [disabled] [ref=e47]:
+      - generic [ref=e50]: Loading…
+    - button "Inspect terrain" [ref=e51] [cursor=pointer]:
+      - generic [ref=e54]: Terrain
+    - button "Open sensor list" [ref=e56] [cursor=pointer]:
+      - generic [ref=e58]: Sensors
+  - generic [ref=e59]: Preparing the map workspace…
+  - generic [ref=e60]:
+    - generic [ref=e61]: Active fire
+    - generic [ref=e63]: Burned ground
+    - generic [ref=e65]: Loading environment
+  - generic "Time controls" [ref=e66]:
+    - generic [ref=e67]:
+      - button "Run" [disabled] [ref=e68]
+      - button "Undo last edit" [disabled] [ref=e72]
+    - generic [ref=e76]:
+      - button "Rewind to start" [disabled] [ref=e77]
+      - button "Play replay" [disabled] [ref=e80]
+      - button "Step forward 5 seconds" [disabled] [ref=e83]
+    - generic [ref=e86]:
+      - generic [ref=e87]:
+        - strong [ref=e88]: 00:00:00
+        - generic [ref=e89]: Following run · 14 Nov, 12:02:13 UTC
+      - slider "Simulation time" [disabled] [ref=e90] [cursor=pointer]: "0"
+      - generic [ref=e91]:
+        - generic [ref=e92]: Start
+        - generic [ref=e93]: 00:00:00 recorded
+    - generic [ref=e94]:
+      - generic [ref=e95]: Replay speed
+      - combobox "Replay speed" [ref=e96]:
+        - option "1×"
+        - option "10×" [selected]
+        - option "60×"
+    - button "Follow run" [pressed] [ref=e97] [cursor=pointer]

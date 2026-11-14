@@ -1,0 +1,13 @@
+{
+  "dataset": "RESOLVE Ecoregions 2017",
+  "version": "2017",
+  "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+  "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+  "license": "CC BY 4.0",
+  "retrievedAt": "2026-11-14T11:32:28.023Z",
+  "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+  "boundaryGeneralizationDegrees": 0.02,
+  "displaySimplificationMetres": 1000,
+  "preprocessingSimplificationDegrees": 0.015,
+  "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate."
+}

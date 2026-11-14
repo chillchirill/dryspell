@@ -1,0 +1,13 @@
+import { performance } from 'node:perf_hooks';
+import { writeFile } from 'node:fs/promises';
+import { fixture } from './test-fixture.ts';
+import { cellCenter,simulateFrame,createCheckpoint,clearSimulationCache,replayFromCheckpoint } from './index.ts';
+const {e,s}=fixture(200);s.config.durationSec=21600;e.weather.samples[0].windSpeedMps=3;e.weather.samples[0].windFromDeg=270;
+s.sensors=Array.from({length:30},(_,i)=>({...s.sensors[0],id:`benchmark-${i}`,deviceId:`benchmark-${i}`,location:cellCenter(e.landscape,200*100+100+i)}));
+const start=performance.now(),cpuStart=process.cpuUsage();let peak=process.memoryUsage().rss;
+const first=simulateFrame(s,e,5),firstMs=performance.now()-start;
+const final=simulateFrame(s,e,21600);peak=Math.max(peak,process.memoryUsage().rss);const elapsedMs=performance.now()-start;
+const seekStart=performance.now();const rewind=simulateFrame(s,e,3600);const seekMs=performance.now()-seekStart;
+const checkpoint=createCheckpoint(s,e,3600);clearSimulationCache();const restored=replayFromCheckpoint(s,e,checkpoint,3600);const cpu=process.cpuUsage(cpuStart);
+const result={fixture:'Controlled synthetic 5 km x 5 km / 25 m grid; not measured real terrain',node:process.version,platform:process.platform,grid:[200,200],sensors:30,durationSec:21600,firstFrameMs:firstMs,elapsedMs,cachedSeekMs:seekMs,peakRssBytes:peak,cpuSeconds:(cpu.user+cpu.system)/1e6,firstChecksum:first.checksum,finalChecksum:final.checksum,rewindIdentical:rewind.checksum===restored.checksum,burnedCells:final.burnedCells.length,burningCells:final.burningCells.length};
+console.log(JSON.stringify(result,null,2));await writeFile('packages/simulation/benchmark-results.json',JSON.stringify(result,null,2));

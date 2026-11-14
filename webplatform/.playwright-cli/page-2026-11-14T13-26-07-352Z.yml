@@ -1,0 +1,58 @@
+- main [ref=e1]:
+  - link "Skip to object tools" [ref=e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Terrain map" [ref=e3]:
+    - region "Map" [ref=e4]
+    - generic:
+      - generic [ref=e5]:
+        - button "Zoom in" [ref=e6] [cursor=pointer]
+        - button "Zoom out" [ref=e8] [cursor=pointer]
+      - generic: 500 m
+      - group [ref=e11]:
+        - generic "Toggle attribution" [ref=e12] [cursor=pointer]
+        - generic [ref=e13]: Esri, HERE, Garmin, © OpenStreetMap contributors, GIS user community
+  - generic [ref=e14]:
+    - group "Map layers" [ref=e15]:
+      - button "Land cover" [pressed] [ref=e16] [cursor=pointer]
+      - button "Ecological zones" [ref=e17] [cursor=pointer]
+    - group [ref=e18]:
+      - generic "Legend 25 m simulation grid inside outline" [ref=e19] [cursor=pointer]:
+        - text: Legend
+        - generic [ref=e20]: 25 m simulation grid inside outline
+      - generic [ref=e21]:
+        - generic [ref=e22]: Forest
+        - generic [ref=e24]: Shrubland
+        - generic [ref=e26]: Grassland
+        - generic [ref=e28]: Cropland
+        - generic [ref=e30]: Built-up
+        - generic [ref=e32]: Water
+        - generic [ref=e34]: Bare / sparse
+      - paragraph [ref=e36]: ESA WorldCover 2021 regional context; 10 m source. The outlined area always shows the effective land cover used by this run.
+  - generic:
+    - text: Burning Burned
+    - generic: Simulated
+  - generic [ref=e37]:
+    - generic [ref=e38]:
+      - strong [ref=e39]: Dryspell
+      - generic [ref=e40]: Sandbox
+    - button "Experiment menu" [ref=e41] [cursor=pointer]
+  - button "Retry weather" [disabled] [ref=e44]
+  - status [ref=e45]: Preparing the landscape…
+  - generic:
+    - toolbar "Object tools" [ref=e47]:
+      - button "Select" [pressed] [ref=e48] [cursor=pointer]
+      - button "Combined" [disabled] [ref=e52]
+      - button "Temperature" [disabled] [ref=e58]
+      - button "Humidity" [disabled] [ref=e62]
+      - button "Smoke" [disabled] [ref=e67]
+      - button "Fire" [disabled] [ref=e71]
+    - generic [ref=e75]:
+      - button "Run" [disabled] [ref=e76]
+      - button "Rewind to start" [disabled] [ref=e80]
+      - status "Simulation time" [ref=e84]: 0:00
+      - slider "Simulation timeline" [disabled] [ref=e85] [cursor=pointer]: "0"
+      - generic [ref=e86]: 6 h
+      - group [ref=e87]:
+        - generic "10×" [ref=e88] [cursor=pointer]
+      - button "Undo last edit" [disabled] [ref=e91]
+      - button "Object list" [ref=e95] [cursor=pointer]

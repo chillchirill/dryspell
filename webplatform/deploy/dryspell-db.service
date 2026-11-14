@@ -1,0 +1,15 @@
+[Unit]
+Description=Dryspell PostgreSQL PostGIS container
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/dryspell
+ExecStart=/usr/bin/docker compose --env-file /etc/dryspell/platform.env up -d --wait db
+ExecStop=/usr/bin/docker compose --env-file /etc/dryspell/platform.env stop db
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

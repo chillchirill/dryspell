@@ -1,0 +1,12 @@
+import { randomBytes, scryptSync } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+const path = resolve(process.env.ADMIN_CONFIG_PATH ?? 'config/admin.config.cjs');
+const password = process.env.DRYSPELL_ADMIN_PASSWORD;
+if (!password || password.length < 12) throw new Error('Set DRYSPELL_ADMIN_PASSWORD to at least 12 characters. It is never printed.');
+const username = process.env.DRYSPELL_ADMIN_USERNAME ?? 'admin';
+const passwordSalt = randomBytes(24).toString('hex');
+const passwordHash = scryptSync(password,passwordSalt,64).toString('hex');
+await mkdir(dirname(path),{recursive:true});
+await writeFile(path,`module.exports = ${JSON.stringify({username,passwordSalt,passwordHash})};\n`,{mode:0o600,flag:process.argv.includes('--replace')?'w':'wx'});
+console.log(`Administrator configuration created at ${path}`);

@@ -1,0 +1,9 @@
+import {describe,it,expect} from 'vitest';
+import {dueWeatherRefresh,type WeatherRefreshCandidate} from './weather-schedule.ts';
+const now=Date.parse('2026-11-14T12:00:00Z');
+function candidate(id:string,created='2026-11-14T10:00:00Z'):WeatherRefreshCandidate{return{id,createdAt:created,sample:false,bounds:{west:179,south:0,east:-179,north:1},weather:{id:'weather-'+id,validAt:'2026-11-14T00:00:00Z',issuedAt:created,samples:[],stale:false,provenance:[{provider:'Open-Meteo',sourceUrl:'https://api.open-meteo.com/v1/forecast',version:'hourly-api',retrievedAt:created,validAt:'2026-11-14T00:00:00Z',license:'CC BY 4.0',attribution:'Open-Meteo',checksum:id,sample:false}]}};}
+describe('bounded hourly real-weather scheduling',()=>{
+  it('selects only newest real snapshot per bounds, once retrieval is an hour old',()=>{const result=dueWeatherRefresh([candidate('old','2026-11-14T08:00:00Z'),candidate('new')],now);expect(result).toHaveLength(1);expect(result[0].environmentId).toBe('new');expect(Math.abs(result[0].location.longitude)).toBe(180);expect(result[0].jobId).toBe('weather-refresh:new:2026-11-14T12');expect(dueWeatherRefresh([candidate('fresh','2026-11-14T11:30:00Z')],now)).toEqual([]);});
+  it('never refreshes demonstration, override, archived or old historical weather',()=>{const sample=candidate('sample');sample.sample=true;const override=candidate('override');override.weather.provenance[0].sample=true;const archive=candidate('archive');archive.weather.provenance[0].sourceUrl='https://archive-api.open-meteo.com/v1/archive';const old=candidate('old');old.weather.validAt='2026-11-01T00:00:00Z';expect(dueWeatherRefresh([sample,override,archive,old],now)).toEqual([]);});
+  it('does not refresh an old snapshot when its newer replacement is still fresh',()=>expect(dueWeatherRefresh([candidate('old'),candidate('new','2026-11-14T11:45:00Z')],now)).toEqual([]));
+});

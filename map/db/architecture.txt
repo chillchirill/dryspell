@@ -1,0 +1,97 @@
+DRYSPELL MAP — real sources and isolated GIS storage
+
+The current map has no generated geography or random environmental readings.
+Default basemap: OpenStreetMap, fetched directly by the browser under its tile
+usage policy, with visible attribution. No OSM tile bulk import is performed.
+
+LAND COVER
+ESA WorldCover 2021 v200 (CC BY 4.0), nominal 10m historical land-cover classes.
+Display tiles: locally rendered ESA COG overviews, zoom 6..14, PNG 256 x 256.
+server/raster-tiles.js selects the source overview by target ground-pixel size,
+reads only intersecting raster windows, projects pixel centers into EPSG:4326,
+and colors real classes without interpolation. Source ranges are aligned to64KiB,
+deduplicated, cached in24MiB RAM and persisted in map.source_ranges. No full-file
+fallback; <=2MiB per HTTP range, <=1MiPixel decoded window, eight source descriptors.
+Four bounded raster jobs; generated PNGs persist in map.rendered_tiles with source,
+year, licence, timestamp and SHA-256. Existing real Terrascope PNGs are reused.
+Land-cover cache version is worldcover-2021-v200, independent of ecological/app
+releases. Startup reuses prior real-source PNGs instead of downloading them again.
+Frontend overzooms cached native tiles above z14 instead of fetching huge data.
+
+Point analysis: native analytical class value from a one-pixel WorldCover COG
+window, never inferred from RGB display colours. Native EPSG:4326 3-degree COG
+files are accessed via HTTP byte ranges: no full-file fallback, <=2MiB/request,
+<=8MiB downloaded per sample, <=16MiB process range cache. Source blocks persist
+in map.source_ranges with provenance; class samples in map.source_records.
+WorldCover class30 is grassland, not proof that a location is a steppe ecoregion.
+Unavailable/nodata coverage stays explicitly unavailable.
+
+ECOREGIONS
+RESOLVE Ecoregions 2017 polygons stored independently in map.ecoregions with
+PostGIS spatial indexing, imported by scripts/import-ecoregions.js. Regional
+steppe/forest-steppe zones are separate from local tree/crop/water cover.
+See db/ecoregions.sql and server/ecoregions.js for source and simplification.
+
+DISPLAY LEVELS (db/lod.sql, server/lod.js)
+map.ecoregion_lod is partitioned into four physical maps with separate GiST indexes:
+world z3-4 (40km simplification), country z5-7 (8km), region z8-10 (2km),
+local z11-14 (source display geometry). Small invisible components are removed
+at coarse levels; every indexed polygon is subdivided to <=128 vertices.
+SQL constrains lod before spatial clipping, allowing partition pruning. It never
+loads detailed source geometry as a fallback for overview rendering. Point
+classification still uses the independent source geometries, not coarse maps.
+WorldCover display uses its embedded COG overview pyramid on pan/zoom. Point
+classification uses a separate full-resolution one-pixel read, not display colors.
+
+scripts/build-lod.js builds the four maps transactionally per level. Imports run
+it automatically. scripts/build-pyramid.js pre-renders local ecological geometry
+for all global tiles z3,4,5 into versioned map.rendered_tiles: 1344 tiles,6.03MiB.
+These views need only indexed PNG reads; memory LRU handles repeat requests.
+No external map bulk download. Other zooms render their matching map on demand.
+map.lod_catalog and map.pyramid_catalog expose sizes and build dates at /api/lod.
+For changed sources/simplification bump WORLD_VERSION and rebuild the pyramid to
+avoid serving an older derived tile cache. Retired versions can be retained until
+existing processes no longer need them.
+
+WEATHER
+Open-Meteo current model forecast, not a physical sensor observation. Explicit
+Celsius, %RH, m/s, degrees and UTC valid/retrieved timestamps. Cache15minutes,
+requested locations quantized to0.02degree buckets (model location retained).
+Provider errors return null values and a source-specific error. Soil moisture,
+water depth and elevation are currently unavailable, never invented.
+
+ISOLATION AND BOUNDS
+Docker project dryspell-map-gis, database dryspell_map, loopback55435, ownvolume.
+No connection to webplatform databases. Defaultmemory mode works withoutPG;
+MAP_DATABASE_URL enables durable sources. PNG LRU32MiB (MAP_CACHE_MB), separate
+queues of32 each for raster rendering (4active, MAP_REMOTE_WORKERS) and ecological
+rendering (2active); samplequeue24,2active. Last-client disconnect cancels queued
+and raster decode work; shared range fetches finish within an8second deadline.
+Browser decoded image LRU16MiB/64tiles, six requests, visible Canvas tiles only.
+Cached ancestors/children paint immediately while detail arrives; switching back
+reuses exact pixels. Images close on eviction; canvas buffers release on removal.
+Failed details retain existing previews and expose a retry action.
+Source records are bounded to512 in process. Remote datasets are never sent as
+full JSON to the browser. Disk caches are persistent and not inherently capped;
+retired tile versions/source datasets may be removed with deliberate retention.
+
+API
+GET /api/world                         metadata, source dates, layer limits
+GET /api/health                        queue and memory-cache statistics
+GET /api/lod                           physical maps and overview pyramid sizes
+GET /api/sample?lat=49.44&lng=32.06      real classes, ecoregion, model forecast
+GET /api/tiles/landcover/{z}/{x}/{y}.png zoom6..14; source ESA2021
+GET /api/tiles/ecoregions/{z}/{x}/{y}.png zoom3..14; source RESOLVE2017
+Tile ETag and one-hour browser caching. No login needed for local map inspection.
+
+VERIFICATION
+node --test tests/terrain.test.js uses injected fixtures, no bulk remote access.
+node --env-file-if-exists=.env scripts/import-real-data.js performs a bounded
+six-point/two-tile live import; retains db/verified-real-sources.json evidence.
+Verified actual water,tree,grass,crop,built classes near Cherkasy/Askania Nova.
+
+Sources:
+https://esa-worldcover.org/en/data-access
+https://wmts.terrascope.be/wmts?SERVICE=WMTS&REQUEST=GetCapabilities
+https://open-meteo.com/en/docs
+https://operations.osmfoundation.org/policies/tiles/

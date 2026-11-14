@@ -1,0 +1,14 @@
+import express from 'express';
+import compression from 'compression';
+import {resolve} from 'node:path';
+import {weather} from './weather';
+import {mapTile} from './map';
+import {prepareArea,AreaRequestError} from './area';
+const app=express();app.disable('x-powered-by');app.use(compression());
+app.get('/health/live',(_req,res)=>res.json({status:'ok',mode:'anonymous-sandbox',database:'not-required'}));
+app.get('/api/sandbox/environment',(_req,res)=>res.sendFile(resolve('data/sandbox/environment.json')));
+app.get('/api/sandbox/weather',async(req,res)=>{const latitude=Number(req.query.latitude),longitude=Number(req.query.longitude);if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>85||Math.abs(longitude)>180){res.status(400).json({error:'Valid latitude and longitude required'});return;}try{res.json(await weather(latitude,longitude,String(req.query.startTime||new Date().toISOString()),req.query.durationSec===undefined?21600:Number(req.query.durationSec)));}catch(error){res.status(503).json({error:error instanceof Error?error.message:'Weather unavailable',retryable:true});}});
+app.post('/api/sandbox/environment/prepare',express.json({limit:'8kb'}),async(req,res)=>{try{res.json(await prepareArea(req.body));}catch(error){res.status(error instanceof AreaRequestError?error.status:503).json({error:error instanceof Error?error.message:'Environmental providers unavailable',retryable:!(error instanceof AreaRequestError)||error.status===429});}});
+app.get('/api/sandbox/map/tiles/:layer/:z/:x/:y.png',async(req,res)=>{try{const bytes=await mapTile(String(req.params.layer),Number(req.params.z),Number(req.params.x),Number(req.params.y));res.set({'Content-Type':'image/png','Cache-Control':'public,max-age=3600','X-Map-Source':'dryspell-map; display palette only'}).send(bytes);}catch(error){res.status(503).set('Retry-After','2').json({error:error instanceof Error?error.message:'Map unavailable'});}});
+app.use(express.static(resolve('apps/sandbox/dist')));app.get('/{*path}',(_req,res)=>res.sendFile(resolve('apps/sandbox/dist/index.html')));
+app.listen(4001,'127.0.0.1',()=>console.log('Dryspell sandbox http://127.0.0.1:4001 (no database or login)'));

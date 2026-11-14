@@ -1,0 +1,67 @@
+{
+  "id": "glendalough-9b9d9c7ba15f",
+  "bounds": {
+    "west": -6.388838371375147,
+    "east": -6.314161628624852,
+    "south": 53.00254222062522,
+    "north": 53.047457779374774
+  },
+  "cellSizeM": 25,
+  "width": 200,
+  "height": 200,
+  "sources": [
+    {
+      "provider": "Copernicus DEM",
+      "sourceUrl": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N53_00_W007_00_DEM/Copernicus_DSM_COG_10_N53_00_W007_00_DEM.tif",
+      "version": "GLO-30 2021",
+      "retrievedAt": "2026-11-14T09:24:17.758Z",
+      "validAt": "2021-01-01T00:00:00Z",
+      "resolutionM": 30,
+      "license": "Copernicus DEM free licence",
+      "attribution": "© DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+      "checksum": "3950f266beaf51ffae02bb1e128caeccf67401533b0fab51b69c724b28de1b33",
+      "sample": true,
+      "parameters": {
+        "bounds": {
+          "west": -6.388838371375147,
+          "east": -6.314161628624852,
+          "south": 53.00254222062522,
+          "north": 53.047457779374774
+        },
+        "width": 200,
+        "height": 200
+      }
+    },
+    {
+      "provider": "ESA WorldCover",
+      "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N51W009_Map.tif",
+      "version": "2021 v200",
+      "retrievedAt": "2026-11-14T09:24:17.758Z",
+      "validAt": "2021-01-01T00:00:00Z",
+      "resolutionM": 10,
+      "license": "CC BY 4.0",
+      "attribution": "ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+      "checksum": "4965b1b0976b68223dd40bf648b8107e312dbce31b18c2873931f3c86dd024cf",
+      "sample": true,
+      "parameters": {
+        "bounds": {
+          "west": -6.388838371375147,
+          "east": -6.314161628624852,
+          "south": 53.00254222062522,
+          "north": 53.047457779374774
+        },
+        "width": 200,
+        "height": 200
+      }
+    }
+  ],
+  "checksum": "9b9d9c7ba15f2ee538acdc3541273e4b99e47cc9745d0c3283149cd887b0c8f9",
+  "classes": {
+    "grass": 26561,
+    "woodland": 12634,
+    "water": 698,
+    "unknown": 53,
+    "built": 52,
+    "scrub": 2
+  }
+}

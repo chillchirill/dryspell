@@ -1,0 +1,17 @@
+{
+  "measuredAt": "2026-11-14T10:55:19.139Z",
+  "runtime": "v24.14.1",
+  "platform": "win32",
+  "sensors": 30,
+  "ticks": 10,
+  "expected": 300,
+  "acknowledged": 300,
+  "persisted": 300,
+  "wsDelivered": 300,
+  "elapsedMs": 10100,
+  "ingestionP95Ms": 288,
+  "wsP95Ms": 238,
+  "wsMaxMs": 272,
+  "databaseGrowthBytes": 983040,
+  "limitations": "Windows host + Docker Desktop; not the 2CPU/3GB Ubuntu reference machine. Ten-second burst, not endurance."
+}

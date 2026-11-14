@@ -1,0 +1,84 @@
+- generic:
+  - generic [aria-hidden]:
+    - main:
+      - link:
+        - /url: "#workspace-tools"
+        - text: Skip to workspace tools
+      - heading [level=1]: Dryspell geographic simulator
+      - generic:
+        - region
+        - generic:
+          - generic [ref=e8]: 1 km
+          - generic [ref=e9]:
+            - button [ref=e110] [cursor=pointer]
+            - button [ref=e111] [cursor=pointer]
+            - button [ref=e112]
+        - group [ref=e16]:
+          - generic [ref=e113] [cursor=pointer]
+          - generic [ref=e18]: Tiles © Esri, HERE, Garmin, USGS, NGA, EPA, NPS; map data © OpenStreetMap contributors
+      - generic:
+        - button:
+          - generic [aria-hidden]: ◈
+          - generic: Dryspell
+        - generic:
+          - generic: Workspace context
+          - combobox
+        - button:
+          - text: Browser acceptance 1794651571093
+          - generic: Prepared sample · Revision 1 · draft
+      - generic:
+        - generic:
+          - generic:
+            - text: 4.0 m/s
+            - generic: from 270°
+        - button:
+          - generic: Layers
+      - navigation:
+        - button [pressed]:
+          - generic: Select
+        - button:
+          - generic: Sensor
+        - button:
+          - generic: Ignite
+        - button:
+          - generic: Terrain
+        - button:
+          - generic: Sensors
+      - generic:
+        - generic: Active fire
+        - generic: Burned ground
+        - generic: Prepared landscape sample
+      - generic:
+        - generic:
+          - button [disabled]:
+            - generic: Run
+          - button [disabled]
+        - generic:
+          - button [disabled]
+          - button [disabled]
+          - button [disabled]
+        - generic:
+          - generic:
+            - strong: 00:00:00
+            - generic: Following run · 1 Jul, 12:00:00 UTC
+          - slider [disabled]: "0"
+          - generic:
+            - generic: Start
+            - generic: 00:00:00 recorded
+        - generic:
+          - generic: Replay speed
+          - combobox
+        - button [pressed]:
+          - generic: Follow run
+  - dialog "Administrator sign in" [ref=e115]:
+    - heading "Administrator sign in" [level=2] [ref=e116]
+    - paragraph [ref=e117]: Sign in to place objects and save changes. Public replay remains available.
+    - generic [ref=e118]:
+      - generic [ref=e119]:
+        - text: Username
+        - textbox "Username" [active] [ref=e120]
+      - generic [ref=e121]:
+        - text: Password
+        - textbox "Password" [ref=e122]
+      - button "Sign in" [ref=e123] [cursor=pointer]
+    - button "Close sign in" [ref=e124] [cursor=pointer]

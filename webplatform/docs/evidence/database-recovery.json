@@ -1,0 +1,9 @@
+{
+  "date": "2026-11-14",
+  "sourceDatabase": "dryspell_test",
+  "restoreDatabase": "dryspell_restore_test",
+  "method": "Actual pg_dump -Fc and pg_restore --exit-on-error inside Docker PostgreSQL/PostGIS container",
+  "restoredCounts": {"telemetry": 5, "scenarios": 7, "environments": 1},
+  "databaseContainerRestartExecuted": true,
+  "limitations": "This verifies database dump/restore and container volume persistence only. Ubuntu systemd coordinated config/artifact backup and clean installation remain unverified."
+}

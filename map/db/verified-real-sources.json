@@ -1,0 +1,462 @@
+{
+  "retrievedAt": "2026-11-14T11:39:22.778Z",
+  "synthetic": false,
+  "samples": [
+    {
+      "name": "Cherkasy city",
+      "lat": 49.44,
+      "lng": 32.06,
+      "synthetic": false,
+      "landCover": {
+        "year": 2021,
+        "pixel": [
+          24720,
+          18720
+        ],
+        "source": "ESA WorldCover",
+        "license": "CC BY 4.0",
+        "version": "2021 v200",
+        "checksum": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+        "provider": "ESA WorldCover",
+        "className": "Built-up",
+        "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N48E030_Map.tif",
+        "analytical": true,
+        "classValue": 50,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+        "resolutionM": 10,
+        "retrievedAt": "2026-11-14T11:36:32.256Z"
+      },
+      "weather": {
+        "kind": "forecast",
+        "stale": false,
+        "license": "CC BY 4.0; free hosted API non-commercial use",
+        "validAt": "2026-11-14T11:30Z",
+        "checksum": "c009146ec642d0d62ad49d42165f1967182b9e33e2ec9fcbb6cfacd654199e8c",
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=49.44&longitude=32.06&current=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+        "humidityPct": 64,
+        "retrievedAt": "2026-11-14T11:36:32.583Z",
+        "windSpeedMs": 3.37,
+        "temperatureC": 7.2,
+        "modelLocation": {
+          "lat": 49.42779,
+          "lng": 32.00925
+        },
+        "windDirectionDeg": 282
+      },
+      "ecoregion": {
+        "name": "East European forest steppe",
+        "zone": "forest-steppe",
+        "biome": "Temperate Broadleaf & Mixed Forests",
+        "ecoregionId": 661,
+        "source": {
+          "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+          "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+          "dataset": "RESOLVE Ecoregions 2017",
+          "license": "CC BY 4.0",
+          "version": "2017",
+          "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate.",
+          "retrievedAt": "2026-11-14T11:32:28.023Z",
+          "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+          "displaySimplificationMetres": 1000,
+          "boundaryGeneralizationDegrees": 0.02,
+          "preprocessingSimplificationDegrees": 0.015
+        }
+      },
+      "biome": "forest-steppe",
+      "water": false,
+      "moisture": null,
+      "soilMoisturePct": null,
+      "waterDepthM": null,
+      "elevation": null,
+      "temperatureC": 7.2,
+      "humidityPct": 64,
+      "windSpeedMs": 3.37,
+      "windDirectionDeg": 282,
+      "errors": []
+    },
+    {
+      "name": "Dnipro reservoir",
+      "lat": 49.5,
+      "lng": 32.15,
+      "synthetic": false,
+      "landCover": {
+        "year": 2021,
+        "pixel": [
+          25799,
+          18000
+        ],
+        "source": "ESA WorldCover",
+        "license": "CC BY 4.0",
+        "version": "2021 v200",
+        "checksum": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
+        "provider": "ESA WorldCover",
+        "className": "Permanent water bodies",
+        "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N48E030_Map.tif",
+        "analytical": true,
+        "classValue": 80,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+        "resolutionM": 10,
+        "retrievedAt": "2026-11-14T11:38:27.493Z"
+      },
+      "weather": {
+        "kind": "forecast",
+        "stale": false,
+        "license": "CC BY 4.0; free hosted API non-commercial use",
+        "validAt": "2026-11-14T11:30Z",
+        "checksum": "0715601dd0104903cd73930b900fa04d1798443aa3084e3a631add5aae090f78",
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=49.5&longitude=32.16&current=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+        "humidityPct": 67,
+        "retrievedAt": "2026-11-14T11:38:27.112Z",
+        "windSpeedMs": 3.54,
+        "temperatureC": 7,
+        "modelLocation": {
+          "lat": 49.561993,
+          "lng": 32.125378
+        },
+        "windDirectionDeg": 278
+      },
+      "ecoregion": {
+        "name": "East European forest steppe",
+        "zone": "forest-steppe",
+        "biome": "Temperate Broadleaf & Mixed Forests",
+        "ecoregionId": 661,
+        "source": {
+          "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+          "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+          "dataset": "RESOLVE Ecoregions 2017",
+          "license": "CC BY 4.0",
+          "version": "2017",
+          "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate.",
+          "retrievedAt": "2026-11-14T11:32:28.023Z",
+          "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+          "displaySimplificationMetres": 1000,
+          "boundaryGeneralizationDegrees": 0.02,
+          "preprocessingSimplificationDegrees": 0.015
+        }
+      },
+      "biome": "forest-steppe",
+      "water": true,
+      "moisture": null,
+      "soilMoisturePct": null,
+      "waterDepthM": null,
+      "elevation": null,
+      "temperatureC": 7,
+      "humidityPct": 67,
+      "windSpeedMs": 3.54,
+      "windDirectionDeg": 278,
+      "errors": []
+    },
+    {
+      "name": "Cherkasy forest",
+      "lat": 49.47,
+      "lng": 31.9,
+      "synthetic": false,
+      "landCover": {
+        "year": 2021,
+        "pixel": [
+          22799,
+          18360
+        ],
+        "source": "ESA WorldCover",
+        "license": "CC BY 4.0",
+        "version": "2021 v200",
+        "checksum": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "provider": "ESA WorldCover",
+        "className": "Tree cover",
+        "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N48E030_Map.tif",
+        "analytical": true,
+        "classValue": 10,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+        "resolutionM": 10,
+        "retrievedAt": "2026-11-14T11:38:42.944Z"
+      },
+      "weather": {
+        "provider": "Open-Meteo",
+        "kind": "forecast",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=49.48&longitude=31.9&current=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+        "license": "CC BY 4.0; free hosted API non-commercial use",
+        "validAt": "2026-11-14T11:30Z",
+        "retrievedAt": "2026-11-14T11:39:23.146Z",
+        "modelLocation": {
+          "lat": 49.464634,
+          "lng": 31.878738
+        },
+        "temperatureC": 7.1,
+        "humidityPct": 63,
+        "windSpeedMs": 2.94,
+        "windDirectionDeg": 280,
+        "checksum": "563f234f27f06a1f53ac38068d9d3b1f35c34a768bedff2fdd4e02c317c55453",
+        "stale": false
+      },
+      "ecoregion": {
+        "name": "East European forest steppe",
+        "zone": "forest-steppe",
+        "biome": "Temperate Broadleaf & Mixed Forests",
+        "ecoregionId": 661,
+        "source": {
+          "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+          "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+          "dataset": "RESOLVE Ecoregions 2017",
+          "license": "CC BY 4.0",
+          "version": "2017",
+          "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate.",
+          "retrievedAt": "2026-11-14T11:32:28.023Z",
+          "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+          "displaySimplificationMetres": 1000,
+          "boundaryGeneralizationDegrees": 0.02,
+          "preprocessingSimplificationDegrees": 0.015
+        }
+      },
+      "biome": "forest-steppe",
+      "water": false,
+      "moisture": null,
+      "soilMoisturePct": null,
+      "waterDepthM": null,
+      "elevation": null,
+      "temperatureC": 7.1,
+      "humidityPct": 63,
+      "windSpeedMs": 2.94,
+      "windDirectionDeg": 280,
+      "errors": []
+    },
+    {
+      "name": "Askania Nova",
+      "lat": 46.45,
+      "lng": 33.87,
+      "synthetic": false,
+      "landCover": {
+        "year": 2021,
+        "pixel": [
+          10439,
+          18599
+        ],
+        "source": "ESA WorldCover",
+        "license": "CC BY 4.0",
+        "version": "2021 v200",
+        "checksum": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+        "provider": "ESA WorldCover",
+        "className": "Built-up",
+        "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N45E033_Map.tif",
+        "analytical": true,
+        "classValue": 50,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+        "resolutionM": 10,
+        "retrievedAt": "2026-11-14T11:38:28.518Z"
+      },
+      "weather": {
+        "kind": "forecast",
+        "stale": false,
+        "license": "CC BY 4.0; free hosted API non-commercial use",
+        "validAt": "2026-11-14T11:30Z",
+        "checksum": "20c5c968d371f51a044d112d9917e466cc1af7e6af18885d96c11936eeb92912",
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=46.46&longitude=33.86&current=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+        "humidityPct": 77,
+        "retrievedAt": "2026-11-14T11:38:27.893Z",
+        "windSpeedMs": 4.79,
+        "temperatureC": 6.8,
+        "modelLocation": {
+          "lat": 46.46032,
+          "lng": 33.889378
+        },
+        "windDirectionDeg": 334
+      },
+      "ecoregion": {
+        "name": "Pontic steppe",
+        "zone": "steppe",
+        "biome": "Temperate Grasslands, Savannas & Shrublands",
+        "ecoregionId": 735,
+        "source": {
+          "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+          "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+          "dataset": "RESOLVE Ecoregions 2017",
+          "license": "CC BY 4.0",
+          "version": "2017",
+          "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate.",
+          "retrievedAt": "2026-11-14T11:32:28.023Z",
+          "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+          "displaySimplificationMetres": 1000,
+          "boundaryGeneralizationDegrees": 0.02,
+          "preprocessingSimplificationDegrees": 0.015
+        }
+      },
+      "biome": "steppe",
+      "water": false,
+      "moisture": null,
+      "soilMoisturePct": null,
+      "waterDepthM": null,
+      "elevation": null,
+      "temperatureC": 6.8,
+      "humidityPct": 77,
+      "windSpeedMs": 4.79,
+      "windDirectionDeg": 334,
+      "errors": []
+    },
+    {
+      "name": "Askania grassland",
+      "lat": 46.456,
+      "lng": 33.9,
+      "synthetic": false,
+      "landCover": {
+        "year": 2021,
+        "pixel": [
+          10799,
+          18527
+        ],
+        "source": "ESA WorldCover",
+        "license": "CC BY 4.0",
+        "version": "2021 v200",
+        "checksum": "9652595f37edd08c51dfa26567e6cd76e6fa2709c3e578478ca398d316837a7a",
+        "provider": "ESA WorldCover",
+        "className": "Grassland",
+        "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N45E033_Map.tif",
+        "analytical": true,
+        "classValue": 30,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+        "resolutionM": 10,
+        "retrievedAt": "2026-11-14T11:38:28.627Z"
+      },
+      "weather": {
+        "kind": "forecast",
+        "stale": false,
+        "license": "CC BY 4.0; free hosted API non-commercial use",
+        "validAt": "2026-11-14T11:30Z",
+        "checksum": "d6fd2c8f5d45f3a35c5a7cf2d38ba22405c33a1bdc929a72ccfd9ed8183457bb",
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=46.46&longitude=33.9&current=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+        "humidityPct": 77,
+        "retrievedAt": "2026-11-14T11:38:28.591Z",
+        "windSpeedMs": 4.79,
+        "temperatureC": 6.7,
+        "modelLocation": {
+          "lat": 46.46032,
+          "lng": 33.889378
+        },
+        "windDirectionDeg": 334
+      },
+      "ecoregion": {
+        "name": "Pontic steppe",
+        "zone": "steppe",
+        "biome": "Temperate Grasslands, Savannas & Shrublands",
+        "ecoregionId": 735,
+        "source": {
+          "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+          "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+          "dataset": "RESOLVE Ecoregions 2017",
+          "license": "CC BY 4.0",
+          "version": "2017",
+          "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate.",
+          "retrievedAt": "2026-11-14T11:32:28.023Z",
+          "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+          "displaySimplificationMetres": 1000,
+          "boundaryGeneralizationDegrees": 0.02,
+          "preprocessingSimplificationDegrees": 0.015
+        }
+      },
+      "biome": "steppe",
+      "water": false,
+      "moisture": null,
+      "soilMoisturePct": null,
+      "waterDepthM": null,
+      "elevation": null,
+      "temperatureC": 6.7,
+      "humidityPct": 77,
+      "windSpeedMs": 4.79,
+      "windDirectionDeg": 334,
+      "errors": []
+    },
+    {
+      "name": "Cherkasy cropland",
+      "lat": 49.3,
+      "lng": 31.9,
+      "synthetic": false,
+      "landCover": {
+        "year": 2021,
+        "pixel": [
+          22799,
+          20400
+        ],
+        "source": "ESA WorldCover",
+        "license": "CC BY 4.0",
+        "version": "2021 v200",
+        "checksum": "32ebb1abcc1c601ceb9c4e3c4faba0caa5b85bb98c4f1e6612c40faa528a91c9",
+        "provider": "ESA WorldCover",
+        "className": "Cropland",
+        "sourceUrl": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N48E030_Map.tif",
+        "analytical": true,
+        "classValue": 40,
+        "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+        "resolutionM": 10,
+        "retrievedAt": "2026-11-14T11:38:28.938Z"
+      },
+      "weather": {
+        "kind": "forecast",
+        "stale": false,
+        "license": "CC BY 4.0; free hosted API non-commercial use",
+        "validAt": "2026-11-14T11:30Z",
+        "checksum": "10b35d02afaab89f65ae093a9b60b23e9509d8013712897a2ce3a04dd58a6130",
+        "provider": "Open-Meteo",
+        "sourceUrl": "https://api.open-meteo.com/v1/forecast?latitude=49.3&longitude=31.9&current=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m&wind_speed_unit=ms&timezone=UTC",
+        "humidityPct": 62,
+        "retrievedAt": "2026-11-14T11:38:28.690Z",
+        "windSpeedMs": 3.54,
+        "temperatureC": 7.4,
+        "modelLocation": {
+          "lat": 49.29342,
+          "lng": 31.893791
+        },
+        "windDirectionDeg": 286
+      },
+      "ecoregion": {
+        "name": "Central European mixed forests",
+        "zone": "forest",
+        "biome": "Temperate Broadleaf & Mixed Forests",
+        "ecoregionId": 654,
+        "source": {
+          "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query?where=1%3D1&outFields=ECO_ID%2CECO_NAME%2CBIOME_NAME%2CBIOME_NUM%2CCOLOR&returnGeometry=true&outSR=4326&maxAllowableOffset=0.02&geometryPrecision=5&f=geojson",
+          "sha256": "502c300330b64d599e12981f55d6a4d79ea14b8e0bddae73cce1fb486d0a4ef5",
+          "dataset": "RESOLVE Ecoregions 2017",
+          "license": "CC BY 4.0",
+          "version": "2017",
+          "description": "Regional ecological context, not current land cover. Display boundaries generalized; point lookup near boundaries is approximate.",
+          "retrievedAt": "2026-11-14T11:32:28.023Z",
+          "documentationUrl": "https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017",
+          "displaySimplificationMetres": 1000,
+          "boundaryGeneralizationDegrees": 0.02,
+          "preprocessingSimplificationDegrees": 0.015
+        }
+      },
+      "biome": "forest",
+      "water": false,
+      "moisture": null,
+      "soilMoisturePct": null,
+      "waterDepthM": null,
+      "elevation": null,
+      "temperatureC": 7.4,
+      "humidityPct": 62,
+      "windSpeedMs": 3.54,
+      "windDirectionDeg": 286,
+      "errors": []
+    }
+  ],
+  "tiles": [
+    {
+      "z": 10,
+      "x": 603,
+      "y": 349,
+      "path": "/api/tiles/landcover/10/603/349.png",
+      "bytes": 15255,
+      "source": "ESA WorldCover 2021 v200"
+    },
+    {
+      "z": 10,
+      "x": 608,
+      "y": 362,
+      "path": "/api/tiles/landcover/10/608/362.png",
+      "bytes": 5572,
+      "source": "ESA WorldCover 2021 v200"
+    }
+  ]
+}

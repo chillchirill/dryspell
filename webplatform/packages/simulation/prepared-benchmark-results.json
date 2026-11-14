@@ -1,0 +1,40 @@
+{
+  "engineVersion": "surface-grid-1.1.2",
+  "environmentId": "glendalough-9b9d9c7ba15f",
+  "landscapeChecksum": "9b9d9c7ba15f2ee538acdc3541273e4b99e47cc9745d0c3283149cd887b0c8f9",
+  "weatherSnapshotId": "sample-dry-westerly-v1",
+  "weatherSamples": 2,
+  "grid": [
+    200,
+    200
+  ],
+  "sensors": 4,
+  "horizonSec": 21600,
+  "ignitionCell": 20100,
+  "initialFrameMs": 484.10319999999996,
+  "firstChecksum": "2084bac0266d2ec73dcc1b9bca574d42226852802108552e74f89eaa5444ba2f",
+  "fullGridConvergence": {
+    "stepSec": [
+      5,
+      2.5
+    ],
+    "maxArrivalDifferenceSec": 0.0000011920092219952494,
+    "comparedReachedCells": 19339,
+    "coverageDifferences": 0,
+    "elapsedMs": 751.2745000000001
+  },
+  "actualTerrainCropComparison": {
+    "grid": [
+      20,
+      20
+    ],
+    "referenceFiveSecondMs": 1387.6852999999999,
+    "optimizedFiveSecondMs": 39.813500000000204,
+    "maxArrivalDifferenceSec": 0.00011765206829750241,
+    "comparedReachedCells": 392,
+    "coverageDifferences": 0
+  },
+  "rssBytes": 137539584,
+  "platform": "win32",
+  "node": "v24.14.1"
+}

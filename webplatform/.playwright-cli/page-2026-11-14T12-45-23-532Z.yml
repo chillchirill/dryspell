@@ -1,0 +1,53 @@
+- main [ref=e1]:
+  - link "Skip to object tools" [ref=e2] [cursor=pointer]:
+    - /url: "#sb-tools"
+  - region "Glendalough terrain map" [ref=e3]:
+    - generic:
+      - region "Map" [ref=e4]
+      - button "Combined 1" [ref=e85] [cursor=pointer]
+    - generic:
+      - generic [ref=e5]:
+        - button "Zoom in" [ref=e6] [cursor=pointer]
+        - button "Zoom out" [ref=e8] [cursor=pointer]
+      - generic: 1 km
+      - group [ref=e11]:
+        - generic "Toggle attribution" [ref=e12] [cursor=pointer]
+        - generic [ref=e13]: Tiles © Esri, HERE, Garmin, USGS, NGA, EPA, NPS; © OpenStreetMap contributors
+  - generic:
+    - text: Burning Burned
+    - generic: Simulated
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - strong [ref=e16]: Dryspell
+      - generic [ref=e17]: Sandbox
+    - button "Experiment menu" [ref=e18] [cursor=pointer]
+  - generic [ref=e20]:
+    - generic [ref=e74]: ↑
+    - generic [ref=e75]:
+      - text: 7 °C
+      - generic [ref=e76]: 5.7 m/s wind
+  - status [ref=e22]: Fire selected. Click the map, or use coordinates.
+  - generic:
+    - generic [ref=e23]:
+      - toolbar "Object tools" [ref=e24]:
+        - button "Select" [ref=e25] [cursor=pointer]
+        - button "Combined" [ref=e29] [cursor=pointer]
+        - button "Temperature" [ref=e35] [cursor=pointer]
+        - button "Humidity" [ref=e39] [cursor=pointer]
+        - button "Smoke" [ref=e44] [cursor=pointer]
+        - button "Fire" [active] [pressed] [ref=e48] [cursor=pointer]
+      - generic [ref=e77]:
+        - generic [ref=e78]: Place fire
+        - button "At map centre" [ref=e79] [cursor=pointer]
+        - button "Coordinates" [ref=e80] [cursor=pointer]
+        - button "Cancel placement" [ref=e81] [cursor=pointer]
+    - generic [ref=e52]:
+      - button "Run" [disabled] [ref=e53]
+      - button "Rewind to start" [disabled] [ref=e57]
+      - status "Simulation time" [ref=e61]: 0:00
+      - slider "Simulation timeline" [disabled] [ref=e62] [cursor=pointer]: "0"
+      - generic [ref=e63]: 30:00
+      - group [ref=e64]:
+        - generic "10×" [ref=e65] [cursor=pointer]
+      - button "Undo last edit" [ref=e68] [cursor=pointer]
+      - button "Object list" [ref=e72] [cursor=pointer]

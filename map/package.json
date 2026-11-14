@@ -1,0 +1,25 @@
+{
+  "name": "dryspell-map",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "gis:up": "docker compose -f compose.gis.yaml up -d --wait",
+    "import:ecoregions": "node --env-file-if-exists=.env scripts/import-ecoregions.js",
+    "import:real": "node --env-file-if-exists=.env scripts/import-real-data.js",
+    "build:lod": "node --env-file-if-exists=.env scripts/build-lod.js",
+    "build:pyramid": "node --env-file-if-exists=.env scripts/build-pyramid.js",
+    "benchmark:lod": "node --env-file-if-exists=.env scripts/benchmark-lod.js",
+    "benchmark": "node scripts/terrain-benchmark.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "geotiff": "3.0.5",
+    "leaflet": "1.9.4",
+    "pg": "8.16.3",
+    "pngjs": "7.0.0",
+    "sharp": "0.35.5",
+    "simplify-js": "1.2.4"
+  }
+}

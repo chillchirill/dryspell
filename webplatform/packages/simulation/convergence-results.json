@@ -1,0 +1,70 @@
+{
+  "model": "surface-grid-1.1.0",
+  "fixture": "Uniform synthetic grass, constant weather, ignition at common cell centre; fixed physical target coordinates",
+  "results": [
+    {
+      "cellSizeM": 50,
+      "targets": [
+        {
+          "xM": 200,
+          "yM": 100,
+          "arrivalSec": 542.5468229635538,
+          "pathLengthM": 223.60679774997897,
+          "euclideanM": 223.60679774997897,
+          "relativeDirectionalError": 0
+        },
+        {
+          "xM": 300,
+          "yM": 100,
+          "arrivalSec": 785.1811383881638,
+          "pathLengthM": 323.60679774997897,
+          "euclideanM": 316.22776601683796,
+          "relativeDirectionalError": 0.02333454720338546
+        }
+      ]
+    },
+    {
+      "cellSizeM": 25,
+      "targets": [
+        {
+          "xM": 200,
+          "yM": 100,
+          "arrivalSec": 542.5468229635538,
+          "pathLengthM": 223.60679774997897,
+          "euclideanM": 223.60679774997897,
+          "relativeDirectionalError": 0
+        },
+        {
+          "xM": 300,
+          "yM": 100,
+          "arrivalSec": 785.181138388164,
+          "pathLengthM": 323.606797749979,
+          "euclideanM": 316.22776601683796,
+          "relativeDirectionalError": 0.02333454720338546
+        }
+      ]
+    },
+    {
+      "cellSizeM": 12.5,
+      "targets": [
+        {
+          "xM": 200,
+          "yM": 100,
+          "arrivalSec": 542.5468229635538,
+          "pathLengthM": 223.60679774997897,
+          "euclideanM": 223.60679774997897,
+          "relativeDirectionalError": 0
+        },
+        {
+          "xM": 300,
+          "yM": 100,
+          "arrivalSec": 785.1811383881635,
+          "pathLengthM": 323.6067977499788,
+          "euclideanM": 316.22776601683796,
+          "relativeDirectionalError": 0.023334547203384792
+        }
+      ]
+    }
+  ],
+  "limitation": "Refinement consistency is demonstrated for these aligned points. Residual16-neighbour anisotropy persists; this is not proof of continuum convergence over arbitrary heterogeneous landscapes."
+}

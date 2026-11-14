@@ -1,0 +1,11 @@
+{
+  "measuredAt": "2026-11-14T10:55:07.691Z",
+  "scenarioId": "3c1d2921-a3c4-42d1-b5ff-b1aa71074535",
+  "revision": 2,
+  "checkpoints": 1,
+  "workerRestartDeterministic": true,
+  "webRestartSessionPreserved": true,
+  "acknowledgedTelemetryBefore": 1227,
+  "acknowledgedTelemetryAfter": 1227,
+  "frameChecksum": "3cddabf6d8a76c503f8e64b84526e6e0d6c7468391be9d8914e07f95b3503d2d"
+}

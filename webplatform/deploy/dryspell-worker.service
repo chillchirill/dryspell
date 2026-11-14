@@ -1,0 +1,27 @@
+[Unit]
+Description=Dryspell analysis worker
+Requires=dryspell-db.service
+After=network-online.target dryspell-db.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=dryspell
+Group=dryspell
+WorkingDirectory=/opt/dryspell
+EnvironmentFile=/etc/dryspell/platform.env
+ExecStart=/usr/bin/node apps/server/dist/worker.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dryspell
+MemoryMax=1200M
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

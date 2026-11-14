@@ -1,0 +1,10 @@
+import {randomBytes} from 'node:crypto';
+import {writeFile} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+import dotenv from 'dotenv';
+dotenv.config({quiet:true});
+const password=randomBytes(24).toString('base64url');
+const result=spawnSync(process.execPath,['--import','tsx','scripts/setup-admin.ts','--replace'],{stdio:'inherit',env:{...process.env,DRYSPELL_ADMIN_PASSWORD:password}});
+if(result.status)throw new Error('Admin setup failed');
+await writeFile('.env.test',`DRYSPELL_TEST_USERNAME=admin\nDRYSPELL_TEST_PASSWORD=${password}\n`,{mode:0o600});
+console.log('Local test credentials saved in ignored .env.test. This setup is for the fresh development workspace only.');

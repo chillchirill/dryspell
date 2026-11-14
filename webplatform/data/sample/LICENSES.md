@@ -1,0 +1,9 @@
+# Prepared landscape licences and attribution
+
+This bundle is a numerical subset and transformation of public environmental rasters, retrieved 14 November 2026. It is not generated map imagery. `manifest.json` records exact source URLs, versions, request bounds, checksums and retrieval time. Classification was resampled to a 25 m analytical grid; elevation was resampled and used to derive slope/aspect. The source data are historical, and the 25 m grid does not establish prediction accuracy.
+
+ESA WorldCover 2021 v200: [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). Attribution: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. Dataset: Zanaga et al. (2022), [ESA WorldCover 10 m 2021 v200](https://doi.org/10.5281/zenodo.7254221). [Official licence and attribution guidance](https://esa-worldcover.org/en/data-access).
+
+Copernicus DEM GLO-30 2021: [official dataset and licence links](https://registry.opendata.aws/copernicus-dem/), [provider readme](https://copernicus-dem-30m.s3.amazonaws.com/readme.html). Attribution: © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. These are derived/resampled data, not an original unmodified DEM product. Copernicus DEM is a surface model including vegetation and structures.
+
+The synthetic dry-weather fixture and illustrative fuel mapping are original Dryspell analytical configuration, offered under CC0-1.0. They are explicitly marked sample data and are not observed weather or a calibrated fire event. The `.bin` files are small source TIFF header excerpts retained as acquisition diagnostics; they have the respective source licences above.

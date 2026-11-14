@@ -1,0 +1,7 @@
+node_modules/
+output/
+.env
+.playwright-cli/
+data/*.geojson
+public/api-config.json
+public/api-config.json.*.tmp

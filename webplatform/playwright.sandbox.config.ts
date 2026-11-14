@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./tests/sandbox',timeout:120000,expect:{timeout:20000},workers:1,reporter:'list',use:{baseURL:'http://127.0.0.1:4001',channel:'chrome',headless:true,viewport:{width:1440,height:900},screenshot:'only-on-failure',trace:'retain-on-failure',launchOptions:{args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}},outputDir:'test-results/sandbox'});

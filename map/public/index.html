@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#14261f">
+  <title>Dryspell · Geographic workspace</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2314261f'/%3E%3Cpath d='M8 23 16 7l8 16M11 18h10' fill='none' stroke='%23cce69a' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/sensors.css">
+  <script defer src="/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Dryspell home"><span class="brand-icon">d<span>↗</span></span>dryspell<span class="brand-divider"></span><span class="brand-sub">Geographic workspace</span></a>
+    <div class="header-right"><span class="simulation-badge"><i></i> REAL GEODATA</span><span class="guest-label">Guest scene · no sign-in</span></div>
+  </header>
+  <main class="workspace">
+    <aside id="sidebar" class="sidebar" aria-label="Map tools">
+      <div class="sidebar-intro"><h1>Know the ground<span>.</span></h1><p>Real landscapes. Your sensor workspace.</p></div>
+      <section class="location-section" aria-label="Choose location">
+        <label for="location-preset">Explore a location</label>
+        <select id="location-preset"><option value="cherkasy">Cherkasy · forest-steppe</option><option value="askania">Askania-Nova · steppe</option><option value="glendalough">Glendalough · forest & lakes</option><option value="custom">Custom location</option></select>
+        <details class="coordinate-details"><summary>Go to coordinates</summary><form id="coordinates-form"><label>Latitude<input id="go-lat" type="number" step="any" min="-85" max="85" value="49.44" required></label><label>Longitude<input id="go-lng" type="number" step="any" min="-180" max="180" value="32.06" required></label><button type="submit">Go</button></form></details>
+      </section>
+      <section class="layers-section" aria-labelledby="layers-heading">
+        <div class="section-heading"><h2 id="layers-heading">Map layers</h2></div>
+        <div class="layer-options" role="group" aria-label="Map layer">
+          <button type="button" data-layer="base" class="layer-button" aria-pressed="false"><span class="layer-symbol">⌖</span><span><strong>Reference map</strong><small>OpenStreetMap roads & places</small></span><span class="layer-radio"></span></button>
+          <button type="button" data-layer="landcover" class="layer-button active" aria-pressed="true"><span class="layer-symbol">◒</span><span><strong>Land cover</strong><small>ESA WorldCover · 2021 · 10 m</small></span><span class="layer-radio"></span></button>
+          <button type="button" data-layer="ecoregions" class="layer-button" aria-pressed="false"><span class="layer-symbol">▱</span><span><strong>Ecological zones</strong><small>Steppe, forest-steppe & forest</small></span><span class="layer-radio"></span></button>
+        </div>
+        <label class="opacity-control" for="overlay-opacity">Overlay opacity <output id="opacity-value">65%</output><input id="overlay-opacity" type="range" min="0" max="100" value="65"></label>
+        <p class="dataset-note" id="dataset-note">2021 land cover is a historical satellite classification, not a live image.</p>
+      </section>
+      <section id="sensor-tools" aria-label="Guest sensor workspace"></section>
+      <details class="sources-details"><summary>Data sources & limitations</summary>
+        <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a> · geographic reference, ODbL.</p>
+        <p><a href="https://esa-worldcover.org/en/data-access" target="_blank" rel="noreferrer">ESA WorldCover 2021 v200</a> · 10 m land-cover classes, CC BY 4.0. Display from source GeoTIFF overviews and cached Terrascope tiles; point values from analytical GeoTIFFs.</p>
+        <p><a href="https://developers.google.com/earth-engine/datasets/catalog/RESOLVE_ECOREGIONS_2017" target="_blank" rel="noreferrer">RESOLVE Ecoregions 2017</a> · regional ecological zones, CC BY 4.0. Generalized boundaries are approximate, not field boundaries.</p>
+        <p><a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a> · forecast baseline, not a sensor observation. Missing measurements stay unavailable.</p>
+        <p>Ecological zone and present-day land cover are different: cropland in a forest-steppe zone is still cropland.</p>
+        <a href="/api/sources" target="_blank">View source metadata ↗</a>
+      </details>
+      <footer class="sidebar-footer"><span class="small-dot"></span> Guest sensors are saved in this browser.</footer>
+    </aside>
+    <section class="map-shell" aria-label="Interactive geographic map">
+      <div id="map" tabindex="0" aria-label="Geographic map. Drag to pan; use plus or minus to zoom."></div>
+      <div class="map-heading"><div class="eyebrow" id="location-title">CHERKASY, UKRAINE</div><h2 id="map-title">Land cover</h2><p id="map-subtitle">ESA WorldCover · 2021 · 10 m</p></div>
+      <div class="map-actions"><button id="inspect-ground" title="Inspect land cover at a point" aria-label="Inspect ground" aria-pressed="false">⌖</button><button id="home-view" title="Return to Cherkasy" aria-label="Initial view">⌂</button><button id="toggle-panel" aria-label="Toggle tools" aria-expanded="true" aria-controls="sidebar">☷</button></div>
+      <div id="loading-state" class="loading-state" role="status">Preparing map…</div>
+      <button id="retry-layer" class="retry-layer" hidden>Retry map details</button>
+      <article id="ground-card" class="ground-card" aria-label="Ground inspector" hidden><button id="close-ground" aria-label="Close ground inspector">×</button><h3>Ground inspector</h3><p id="ground-coordinates"></p><div id="ground-content" aria-live="polite"></div></article>
+      <button id="quick-add-sensor" class="quick-add-sensor" aria-pressed="false">＋ Add sensor</button>
+      <div class="map-legend" id="legend"></div>
+      <div class="map-bottom"><span id="coordinates">49.4400° N · 32.0600° E</span><span id="zoom-level">Z11</span><span id="tile-count">0 tiles</span><span id="sensor-count">0 sensors</span></div>
+      <div id="fatal-error" class="fatal-error" hidden><h2>Map is temporarily unavailable</h2><p id="error-message"></p><button onclick="location.reload()">Try again</button></div>
+    </section>
+  </main>
+</body>
+</html>

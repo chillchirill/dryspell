@@ -1,0 +1,42 @@
+.sensor-panel { color: #e4ece8; padding-top: 22px; border-top: 1px solid #30413d; }
+.sensor-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.sensor-heading h2 { font-size:16px; font-weight:650; margin:0; }
+.sensor-count { font-size:11px; font-variant-numeric:tabular-nums; color:#afc0b7; background:#243931; padding:4px 7px; border-radius:5px; }
+.sensor-intro { color:#94aaa1; font-size:12px; margin:7px 0 17px; }
+.sensor-panel .sensor-label { display:block; margin:12px 0 6px; color:#b0c3b8; font-size:11px; letter-spacing:.02em; }
+.sensor-panel select,.sensor-panel input:not([type=file]) { display:block; width:100%; box-sizing:border-box; min-height:39px; background:#152720; border:1px solid #3b5145; border-radius:7px; padding:9px 10px; color:#e6eee8; font:inherit; font-size:12px; }
+.sensor-panel button { border:1px solid #3b5145; color:#d5e4db; background:#24382e; border-radius:7px; min-height:36px; padding:8px 10px; font:inherit; font-size:12px; cursor:pointer; transition:background .15s; }
+.sensor-panel button:hover { background:#334b3d; }
+.sensor-panel button:disabled { opacity:.45; cursor:not-allowed; }
+.sensor-panel button:focus-visible,.sensor-panel input:focus-visible,.sensor-panel select:focus-visible { outline:2px solid #c2db8b; outline-offset:3px; }
+.sensor-panel .sensor-add { display:block; width:100%; margin-top:10px; background:#cfdf9e; color:#1a3023; border-color:#cfdf9e; font-weight:650; }
+.sensor-panel .sensor-add:hover { background:#e0edbb; }
+.sensor-panel .sensor-add[aria-pressed=true] { background:#f1d9a6; border-color:#f1d9a6; }
+.sensor-panel .sensor-at-center { width:100%; margin-top:7px; background:transparent; min-height:31px; }
+.sensor-status { min-height:32px; font-size:11px; line-height:1.5; color:#acbeaf; margin:10px 0 14px; }
+.sensor-status.is-error { color:#ffc5a5; }
+.sensor-detail { border:1px solid #405547; background:#1a3025; border-radius:10px; padding:13px; margin-top:14px; }
+.sensor-detail[hidden] { display:none; }
+.sensor-detail-heading { display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:11px; font-weight:600; }
+.sensor-demo { color:#c2d793; background:#30452b; padding:3px 6px; border-radius:4px; font-size:9px; }
+.sensor-coordinates { color:#90aa99; font:10px/1.5 ui-monospace,monospace; margin:8px 0 13px; }
+.sensor-reading { min-height:47px; font-size:11px; line-height:1.5; color:#b6c9ba; }
+.sensor-reading strong { display:block; font-size:28px; font-weight:500; letter-spacing:-1px; line-height:1.2; color:#eaf2d7; font-variant-numeric:tabular-nums; }
+.sensor-reading span { display:block; margin-top:5px; color:#99b19d; font-size:10px; }
+.sensor-reading-row + .sensor-reading-row { margin-top:12px; padding-top:9px; border-top:1px solid #30483a; }
+.sensor-reading-row strong { margin-top:4px; font-size:23px; }
+.sensor-geography { display:grid; grid-template-columns:auto 1fr; gap:5px 10px; margin:10px 0 14px; font-size:10px; line-height:1.5; }
+.sensor-geography dt { color:#92ad9a; }
+.sensor-geography dd { color:#d3e1ce; margin:0; overflow-wrap:anywhere; }
+.sensor-provenance { color:#90aa99; font-size:9px; line-height:1.6; overflow-wrap:anywhere; margin:14px 0 0; }
+.sensor-move-editor { border-top:1px solid #405547; margin-top:13px; padding-top:8px; }
+.sensor-move-editor[hidden] { display:none; }
+.sensor-move-editor p { font-size:10px; line-height:1.5; color:#b3c5b3; }
+.sensor-detail-actions,.sensor-file-actions { display:flex; gap:7px; margin-top:15px; }
+.sensor-detail-actions button,.sensor-file-actions button { flex:1; }
+.sensor-panel .sensor-delete { color:#efb59d; }
+.sensor-file-actions { margin-top:18px; }
+.sensor-file-actions button { font-size:11px; }
+.sensor-footnote { color:#829b8d; font-size:10px; line-height:1.6; margin:10px 0 0; }
+.sensor-canvas { position:absolute; top:0; left:0; pointer-events:none; z-index:450; }
+.sensor-placement-active { cursor:crosshair!important; }

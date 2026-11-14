@@ -1,0 +1,11 @@
+[Unit]
+Description=Dryspell retention and backup
+After=dryspell-db.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/dryspell
+EnvironmentFile=/etc/dryspell/platform.env
+ExecStart=/usr/bin/node --import tsx scripts/maintenance.ts
+ExecStart=/bin/bash /opt/dryspell/scripts/backup.sh /var/lib/dryspell/backups
+UMask=0077

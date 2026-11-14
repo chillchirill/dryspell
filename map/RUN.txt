@@ -1,0 +1,130 @@
+DRYSPELL — REAL GEOGRAPHIC WORKSPACE
+
+Open http://127.0.0.1:4176
+Independent application in D:\dryspell\map. English interface, guest editing.
+The webplatform code and its running services are not modified by this project.
+
+START
+Node.js 22.9+ and Docker are required for the full local GIS configuration.
+  npm install
+  npm run gis:up
+  Copy-Item .env.example .env
+  npm run import:ecoregions
+  npm run build:pyramid
+  npm run import:real
+  npm start
+
+The current local database is already imported and the server is running.
+Do not start a second server on the same port. A future normal restart only
+requires the database and npm start; repeat imports only to recreate data.
+
+REAL DATA, NOT GENERATED GEOGRAPHY
+1. OpenStreetMap: reference roads, places and water outlines. Browser-delivered
+   tiles with visible attribution and normal HTTP caching. No bulk tile download.
+2. ESA WorldCover 2021 v200: historical 10 m land-cover data. Tree cover, water,
+   grassland, cropland, built-up, shrubland and other source classes stay distinct.
+   Display tiles are rendered locally from source GeoTIFF overviews. Only bounded
+   source blocks are downloaded and cached in PostgreSQL; existing official
+   Terrascope PNGs are reused. New display tiles do not depend on Terrascope WMTS.
+   Ground and sensor inspectors read the analytical class from the GeoTIFF using
+   bounded HTTP ranges, never by guessing the class from display colors.
+3. RESOLVE Ecoregions 2017: source polygons imported into PostGIS with GiST spatial
+   indexes and four physically separate display levels. Regional steppe and
+   forest-steppe are ecological context, not a replacement for local land cover.
+   Cropland in a forest-steppe region is still cropland. Boundaries are generalized
+   and approximate; they are not parcel boundaries or a current forest inventory.
+4. Open-Meteo: actual model forecast temperature, humidity and wind, with valid
+   and retrieval times. It is explicitly a forecast baseline, not sensor telemetry.
+   Smoke, soil moisture, water depth and elevation remain unavailable unless a
+   corresponding measured/modelled source is implemented. Missing is never zero.
+
+Coverage: global reference map and ecological zones. WorldCover display at
+zoom 6–14 within its terrestrial coverage; above zoom 14 the existing 10 m pixels
+are enlarged. Source dates are visible. New uncached remote data require internet;
+provider failures show unavailable data rather than synthetic substitutes.
+
+DATABASE AND MEMORY
+PostGIS: Docker project dryspell-map-gis, localhost:55435, database dryspell_map,
+independent persistent volume. Nothing is stored in webplatform's database.
+map.ecoregions: source regional geometries, used for point classification.
+map.ecoregion_lod: four physical partitions, each with its own spatial index:
+  world z3-4, country z5-7, region z8-10, local z11-14 (overzoom above z14).
+Tile rendering selects one partition only; it never falls back to full geometry.
+Each geometry piece has at most 128 vertices. World geometry is about 25 times
+smaller than local geometry (0.59 versus 14.81 MiB of geometric data).
+map.lod_catalog: actual level sizes, ranges and build timestamps.
+map.pyramid_catalog: pre-rendered ecological XYZ pyramid inventory.
+All 1,344 global ecological tiles at z3-5 are stored in PostgreSQL (~6.03 MiB).
+Overview requests read ready PNGs without querying geometry or running rendering.
+Other ecological tiles are generated on demand from their level and persisted.
+map.ecoregion_sources: source URL, dates, checksum and generalization metadata.
+map.rendered_tiles: compressed 256px PNGs keyed by version/layer/z/x/y.
+map.source_ranges: cached bounded analytical GeoTIFF byte ranges and provenance.
+map.source_records: real class samples and expiring weather records.
+Default PNG RAM cache: 32 MiB. Analytical range RAM cache: 16 MiB.
+Display COG block cache: 24 MiB, eight source descriptors, <=2 MiB per HTTP range.
+Display reads the nearest suitable source overview, never entire GeoTIFFs.
+Four raster jobs and two independent ecological jobs, cancellable bounded queues;
+six browser overlay fetches, obsolete requests cancelled.
+The browser retains at most 64 decoded tiles (16 MiB), immediately draws cached
+parent/child pixels during zoom, and reuses exact images when switching layers.
+Eviction closes image resources; unloaded tile canvases release their buffers.
+Transient failures retry; the last available overview remains visible with a
+Retry map details button. One separate Canvas supports up to 500 guest sensors.
+WorldCover PNG cache versions follow the source year/version, not app releases.
+The browser never receives a global raster or the full ecological polygon set.
+Persistent disk caches are not automatically size capped.
+
+TOOLS
+Switch Reference map / Land cover / Ecological zones; change overlay opacity.
+Choose Cherkasy, Askania-Nova, Glendalough or enter coordinates anywhere supported.
+Inspect ground: click the crosshair, then a point to see source classes and region.
+Add sensor: click the always-visible Add sensor button, then click the map.
+Profiles: combined, temperature, humidity, smoke, plus soil/wind/water tools.
+Sensors are local scene objects, not connected hardware. No sign-in is required.
+Select a marker or the sensor list to inspect data. Move previews a location;
+Save commits, Cancel/Esc preserves the original. Rename/delete/import/export work.
+Guest scenes persist in browser localStorage, with a 500-sensor/512 KiB import cap.
+
+RELATION TO WEBPLATFORM REQUIREMENTS
+Read IMPLEMENTATION_PLAN, README, CONTRACTS, SOURCES and DESIGN. Applied real
+analytical land-cover sources, separate ecosystem context, provenance/time and
+missing-value semantics, English UI, combined/temperature/humidity/smoke profiles,
+exclusive placement/move tools and explicit Save/Cancel. Guest authorization here
+follows the user's request. This standalone map does not claim to run webplatform's
+wildfire propagation, inference, historical telemetry or replay engine.
+
+VERIFY
+  npm test
+  node --env-file=.env --test tests/*.test.js
+  npm run benchmark
+  npm run benchmark:lod
+  node --env-file=.env scripts/verify-cog-render.js
+Rebuild derived ecological levels with npm run build:lod (also run by import).
+Then run npm run build:pyramid to prepare the global overview. When changing
+source data or simplification, bump WORLD_VERSION before rebuilding tile caches.
+The pyramid build uses local geometry only, never remote OSM/ESA prefetching.
+The second command also validates all imported geometries and actual region lookups.
+The benchmark requests only our local ecological tiles, not OSM bulk downloads.
+db/verified-real-sources.json retains six live acquisitions demonstrating actual
+water/tree/grass/crop/built classes and their ecosystem/forecast provenance.
+output/playwright contains browser checks and captures; not source controlled.
+
+API
+  /api/world
+  /api/sources
+  /api/health
+  /api/lod
+  /api/sample?lat=49.5&lng=32.15
+  /api/tiles/landcover/{z}/{x}/{y}.png
+  /api/tiles/ecoregions/{z}/{x}/{y}.png
+
+Sources and licences: data/ecoregions-source.json, db/architecture.txt, and the
+Data sources & limitations section in the English application.
+
+CURRENT RUNNING SESSION
+The existing frontend remains at http://127.0.0.1:4176; its browser storage stays
+on that origin. The progressive/COG API runs alongside it at http://127.0.0.1:4180.
+public/api-config.json routes requests there with restricted local CORS.
+Existing servers were not stopped. On a future normal single-server startup,
+npm start rewrites this runtime file to its own listening origin automatically.

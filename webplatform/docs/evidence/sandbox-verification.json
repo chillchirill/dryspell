@@ -1,0 +1,25 @@
+{
+  "verifiedAt": "2026-11-14T13:02:34.9886435Z",
+  "url": "http://127.0.0.1:4001",
+  "health": {
+    "status": "ok",
+    "mode": "anonymous-sandbox",
+    "database": "not-required"
+  },
+  "unitTests": 36,
+  "unitFiles": 9,
+  "fullBrowserCases": 7,
+  "finalFocusedCases": 3,
+  "distinctBrowserCases": 8,
+  "postBrowserChange": "Paused notice copy only",
+  "liveWeather": "Open-Meteo HTTP verified separately from E2E fixtures",
+  "mapIntegration": "4177 point API verified; area grid/elevation pending",
+  "sourceHashes": {
+    "packages/contracts/src/sandbox.ts": "8F1158878C249276873826F8E6550E1F4E2FE26A6558A7EF492D9BAEC36F7523",
+    "packages/simulation/src/index.ts": "60AD5B4A3A83AFF8A2D46C578F148917D3019258011A84364F19067CD278C0C2",
+    "apps/sandbox/src/runtime/controller.ts": "A58ACCB93B59B87B5F51480B7AF6607070649EC911E87CAABFB797059E373BBE",
+    "apps/sandbox/src/ui/sandbox.css": "33773AEF47799AF044E3B136D8659D3F6FE1F16C1B1A33EE2EA4E1CF3F74EDF5",
+    "apps/sandbox/server/weather.ts": "98F4D371E3DEA13BEA43078371BA82783C2CCE2C9EEB62F25ED32302BCC9E270",
+    "apps/sandbox/src/ui/App.tsx": "47307D1A434B30112ABB469D47C8BA0334960A4CC464F9100E3245ACFC7FE88C"
+  }
+}

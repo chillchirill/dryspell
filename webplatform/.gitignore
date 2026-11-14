@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.test
+config/admin.config.cjs
+data/private/
+data/models/
+test-results/
+playwright-report/
+*.log
+__pycache__/
+*.pyc
+dist-server/

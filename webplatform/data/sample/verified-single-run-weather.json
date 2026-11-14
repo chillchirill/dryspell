@@ -1,0 +1,216 @@
+{
+  "id": "weather-b375c5ef03b63750287a",
+  "validAt": "2026-11-01T01:00:00.000Z",
+  "issuedAt": "2026-11-14T09:37:20.747Z",
+  "samples": [
+    {
+      "timeSec": 0,
+      "temperatureC": 9.4,
+      "humidityPct": 100,
+      "windSpeedMps": 2.3,
+      "windFromDeg": 326,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 3600,
+      "temperatureC": 9,
+      "humidityPct": 98,
+      "windSpeedMps": 2.96,
+      "windFromDeg": 338,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 7200,
+      "temperatureC": 8.5,
+      "humidityPct": 97,
+      "windSpeedMps": 3.28,
+      "windFromDeg": 344,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 10800,
+      "temperatureC": 8.1,
+      "humidityPct": 97,
+      "windSpeedMps": 3.19,
+      "windFromDeg": 343,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 14400,
+      "temperatureC": 7.8,
+      "humidityPct": 95,
+      "windSpeedMps": 3.5,
+      "windFromDeg": 346,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 18000,
+      "temperatureC": 7,
+      "humidityPct": 94,
+      "windSpeedMps": 3.61,
+      "windFromDeg": 343,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 21600,
+      "temperatureC": 6,
+      "humidityPct": 92,
+      "windSpeedMps": 3.94,
+      "windFromDeg": 345,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 25200,
+      "temperatureC": 5.6,
+      "humidityPct": 90,
+      "windSpeedMps": 4.13,
+      "windFromDeg": 341,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 28800,
+      "temperatureC": 6.6,
+      "humidityPct": 88,
+      "windSpeedMps": 4.33,
+      "windFromDeg": 346,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 32400,
+      "temperatureC": 8,
+      "humidityPct": 85,
+      "windSpeedMps": 4.42,
+      "windFromDeg": 355,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 36000,
+      "temperatureC": 8.8,
+      "humidityPct": 78,
+      "windSpeedMps": 4.81,
+      "windFromDeg": 357,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 39600,
+      "temperatureC": 9.4,
+      "humidityPct": 75,
+      "windSpeedMps": 4.91,
+      "windFromDeg": 4,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 43200,
+      "temperatureC": 9.6,
+      "humidityPct": 74,
+      "windSpeedMps": 4.63,
+      "windFromDeg": 6,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 46800,
+      "temperatureC": 9.5,
+      "humidityPct": 73,
+      "windSpeedMps": 4.7,
+      "windFromDeg": 12,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 50400,
+      "temperatureC": 9.1,
+      "humidityPct": 74,
+      "windSpeedMps": 4.57,
+      "windFromDeg": 13,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 54000,
+      "temperatureC": 8.3,
+      "humidityPct": 78,
+      "windSpeedMps": 4.16,
+      "windFromDeg": 13,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 57600,
+      "temperatureC": 7.3,
+      "humidityPct": 86,
+      "windSpeedMps": 3.4,
+      "windFromDeg": 360,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 61200,
+      "temperatureC": 6.3,
+      "humidityPct": 89,
+      "windSpeedMps": 3.59,
+      "windFromDeg": 352,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 64800,
+      "temperatureC": 5.9,
+      "humidityPct": 90,
+      "windSpeedMps": 3.67,
+      "windFromDeg": 355,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 68400,
+      "temperatureC": 5.7,
+      "humidityPct": 92,
+      "windSpeedMps": 4.05,
+      "windFromDeg": 360,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 72000,
+      "temperatureC": 5.8,
+      "humidityPct": 92,
+      "windSpeedMps": 4.29,
+      "windFromDeg": 7,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 75600,
+      "temperatureC": 6,
+      "humidityPct": 92,
+      "windSpeedMps": 4.32,
+      "windFromDeg": 13,
+      "precipitationMm": 0
+    },
+    {
+      "timeSec": 79200,
+      "temperatureC": 6.2,
+      "humidityPct": 89,
+      "windSpeedMps": 4,
+      "windFromDeg": 18,
+      "precipitationMm": 0
+    }
+  ],
+  "provenance": [
+    {
+      "provider": "Open-Meteo",
+      "sourceUrl": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=53.025&longitude=-6.3515&hourly=temperature_2m%2Crelative_humidity_2m%2Cwind_speed_10m%2Cwind_direction_10m%2Cprecipitation&wind_speed_unit=ms&temperature_unit=celsius&precipitation_unit=mm&timezone=UTC&forecast_days=1&run=2026-11-01T00%3A00&models=ecmwf_ifs",
+      "version": "2026-11-01T00:00",
+      "retrievedAt": "2026-11-14T09:37:20.747Z",
+      "validAt": "2026-11-01T01:00:00.000Z",
+      "license": "CC BY 4.0; hosted API non-commercial terms",
+      "attribution": "Open-Meteo",
+      "checksum": "b375c5ef03b63750287afc47c9bb7fd3226ea78bfa77e1a22fe2aa5b406cf848",
+      "sample": false,
+      "parameters": {
+        "location": {
+          "longitude": -6.3515,
+          "latitude": 53.025
+        },
+        "runInitializationAt": "2026-11-01T00:00",
+        "model": "ecmwf_ifs",
+        "omittedLeadingHours": 1,
+        "omittedTrailingHours": 0,
+        "availabilityPolicy": "Conservative retrieval cutoff; initialization is not publication time"
+      }
+    }
+  ],
+  "stale": false
+}

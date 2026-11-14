@@ -1,0 +1,2 @@
+import type {WeatherSnapshot} from '@dryspell/contracts';
+export function weatherExtension(weather:WeatherSnapshot|undefined,durationSec:number){for(const source of weather?.provenance??[]){const p=source.parameters;if(p?.extensionPolicy==='hold-last-conditions'&&typeof p.forecastEndSec==='number'&&typeof p.extensionEndSec==='number'&&Number.isFinite(p.forecastEndSec)&&Number.isFinite(p.extensionEndSec)&&durationSec>p.forecastEndSec)return {forecastEndSec:p.forecastEndSec,extensionEndSec:p.extensionEndSec};}return null;}

@@ -1,0 +1,41 @@
+{
+  "checkedAt": "2026-11-14T13:24:50.338Z",
+  "mode": "actual upstream4177 and sandbox4001 HTTP; no fixtures",
+  "environmentId": "glendalough-9b9d9c7ba15f-classes-4e4b0eb212bd",
+  "landscapeChecksum": "4e4b0eb212bd2222534c80ac3357a94b64b2cbdcb0eb17b70a5099e033b8b305",
+  "sourceClasses": [
+    10,
+    20,
+    30,
+    50,
+    60,
+    80,
+    90
+  ],
+  "tiles": [
+    {
+      "layer": "landcover",
+      "z": 12,
+      "x": 1975,
+      "y": 1333,
+      "width": 256,
+      "height": 256,
+      "opaquePixels": 65536,
+      "changedPixels": 65536,
+      "source": "dryspell-map; display palette only",
+      "sha256": "73939b3be1bf4ac6e7bebd7cc3b666026bd6aed3ea436939c8ecbabae9d56dfc"
+    },
+    {
+      "layer": "ecoregions",
+      "z": 12,
+      "x": 1975,
+      "y": 1333,
+      "width": 256,
+      "height": 256,
+      "opaquePixels": 65536,
+      "changedPixels": 0,
+      "source": "dryspell-map; display palette only",
+      "sha256": "893f879b9a80a3c77a04490e6f6b162c9c74eb763b222e7eee7ecc32244981fb"
+    }
+  ]
+}

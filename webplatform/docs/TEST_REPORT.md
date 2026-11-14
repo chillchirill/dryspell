@@ -1,0 +1,56 @@
+# Verification report — 14 November 2026
+
+## Execution environment
+
+Windows, Node24.14.1, Docker Desktop PostgreSQL17/PostGIS3.5. HTTP/WS binds127.0.0.1:4000; database binds127.0.0.1:55432. No Windows firewall rules were changed. The host reports12 logical processors and14,887,411,712 bytes of RAM. This is not the plan's2CPU/3GB Ubuntu reference machine.
+
+The controlled harness uses a dedicated `dryspell_test` database, compiled Express and worker entry points, compiled React assets, real PostgreSQL transactions and real WebSocket delivery. Internal services are not replaced with mocks. Provider/numerical fixtures are explicitly labelled; the recovery browser test injects one503 only to exercise a failed save, then retries against the real API.
+
+## Executed checks
+
+- Full TypeScript checking and production build passed. The MapLibre6 worker is emitted as a same-origin compiled asset. Bundle-size warnings remain; they are not hidden or treated as a performance pass.
+- The latest completed full backend suite passed84 tests across18 files. It covers capabilities/zero/missing values, authentication, persistence, real telemetry/outbox, delayed observations, worker jobs, geographic WS subscriptions and reconnect, physical invariants, inference cutoffs, model fallback and normalized regional preprocessing.
+- Hard worker termination/restart resumed from a persisted checkpoint with the same frame checksum as uninterrupted computation. Web restart preserved the administrator session and acknowledged telemetry. See `docs/evidence/restart-check.json`.
+- Thirty actual API devices sent300 packets over ten seconds; every packet was acknowledged, stored and delivered over WS. Final ingestion p95 was288 ms and WS p95 was238 ms; timings are retained in `docs/evidence/load-check.json`. This is a short Windows/Docker workload, not endurance certification.
+- Actual `pg_dump -Fc`/`pg_restore` into a separate database preserved the checked telemetry/scenario/environment counts. A Docker database restart retained volume data. See `docs/evidence/database-recovery.json`; this does not verify Ubuntu coordinated config/artifact backup.
+- TFRecord known-vector, valid-record and corrupted-record checks passed with `python tests/integration/converter_check.py`.
+- `npm audit` reports zero vulnerabilities; the JSON result is retained in `docs/evidence/dependency-audit.json`.
+- All Ubuntu shell scripts passed `bash -n` through WSL. Clean installation, systemd reboot startup and operational restore remain unverified. Earlier systemd verification was blocked by missing WSL Node/docker.service dependencies.
+
+## Browser evidence
+
+Six real Chrome journeys cover delayed chart history with zero/missing values; ten-minute fire progression; keyboard placement/save failure/retry/undo/movement; four-profile placement, reload, water rejection, run/pause/rewind, terrain and estimate inspection; touch Live ingestion plus full touch simulator placement/run/rewind; and native200% Chrome zoom.
+
+A previous six-journey run passed its behavioural assertions but visual inspection exposed the missing MapLibre worker, which prevented vector layers from rendering. The tests now also require actual rendered fire and estimate features. A subsequent progression check reached590/600 seconds just beyond its120-second wait; it did not indicate nondeterminism. The worker now caches at most four immutable environment snapshots, and the test allows180 seconds. **Final full-stack verification passed: 84 tests, all six browser journeys, restart/load and HTTP/static/auth/WS smoke checks.** The visible ten-minute fire check completed in about1.7 minutes on this host; its rendered-feature assertion passed. A final tablet-only legend adjustment then passed a separate real-browser layout check at1280,768,390 and320 pixels. This gives seven browser checks overall; the extra layout check used the main local stack read-only.
+
+Captures are under `output/playwright`. They are manually reviewed browser evidence, not a scientific validation dataset. Environmental inputs and simulation start time are fixed by the prepared fixture; external topographic tiles can change and these captures are not asserted as pixel-identical CI goldens.
+
+## Provider and scientific boundaries
+
+Actual WorldCover2021 and Copernicus DSM extraction, live Open-Meteo, historical archive and a single forecast-run response were acquired and retained with provenance. The prepared dry-weather scenario uses explicitly synthetic weather. FIRMS live access lacks `FIRMS_MAP_KEY`; Overpass requests failed in this environment. Those sources are not claimed live-verified.
+
+The TensorFlow CPU pipeline trained/exported/reloaded a small synthetic compatibility fixture. No real historical production model was trained, evaluated or promoted. Required georeferenced complete-event/geographic/time metadata, licensed shards and matching physical-baseline values are absent. The normalized regional converter enforces coverage and availability rules, but raw VIIRS HDF/swath/geolocation/QA decoding and genuine regional data acquisition remain incomplete. See `ML.md` and `REGIONAL_DATASET.md`.
+
+The fire engine is experimental, with documented equivalent-dead fuel subsets and discretization limits. Deterministic tests and browser passes establish software behaviour, not wildfire prediction accuracy.
+
+## Anonymous sandbox acceptance —14November2026
+This supersedes neither the historical platform tests nor its unresolved external milestones; it verifies the new anonymous entry at127.0.0.1:4001. Final build and workspace typecheck passed. Root ran36tests across9files for numerical/session/runtime, weather, import and geography boundaries. Independent QA ran7complete Chrome journeys and3focused layout/fire journeys after visual fixes (8distinct cases). The final post-test build changes only paused-notice copy. Actual Open-Meteo acquisition passed through the compiled HTTP server. Deterministic E2E uses external-weather fixtures while keeping real React/IndexedDB/browser-worker/terrain endpoint integrations. See SANDBOX_REVIEW.md for commands, captures, defect closure and exact limits. The sandbox requires no PostgreSQL; no database integration is claimed for it. Map project's4177point API was independently read; the required area grid/elevation handoff remains pending in MAP_INTEGRATION.md.
+
+## Regional map / six-hour / linear-wind revision acceptance
+Final compiled sandbox assets: `index-CpJLKkqp.js`, `index-OwmWRxb6.css`, `simulation.worker-hbQrqRx1.js`. `npm run sandbox:build` and final `npm run typecheck` passed. Both coordinator and independent reviewer executed `npx vitest run packages/simulation apps/sandbox`: 68 tests in 14 files passed. `git diff --check -- .` passed for tracked changes; most implementation files remain untracked existing project work, so this is not a full-tree whitespace certification.
+
+Independent Chrome review covers 11 distinct cases: the full suite had ten passes and one incorrect reviewer locator, then three focused cases passed after correcting that locator and final responsive CSS. Final focused command: `npx playwright test --config playwright.sandbox.config.ts --grep 'six-hour horizon|mobile touch|native Chrome'`. Exact run details are in SANDBOX_REVIEW.md. The actual browser worker reconstructed six hours, rewound to ten seconds and reproduced both checksums. Layer switches preserve numerical inputs/checksums; old-model migration is explicit. Final mobile control hit-tests and expanded-attribution non-overlap passed; coordinator inspected final mobile/native-200%-zoom captures. Weather responses alone use labelled deterministic external fixtures.
+
+Actual map upstream/proxy HTTP PNG checks passed, including source alpha preservation and numerical environment invariance (`tests/sandbox/map-probe-result.json`). Coordinator separately verified an actual regional tile containing wheat cropland and neutral towns. Original ESA numerical classes were reacquired into `data/sandbox/environment.json`; this is actual provider acquisition, not a fabricated regional dataset.
+
+Engine 1.2.0 uses a linear positive along-wind multiplier and reciprocal backing response below the existing final spread safety cap. Eight-direction, reference/optimized, water and linear-increment tests pass. Actual six-hour Node diagnostic with prepared synthetic weather, 40,000 cells and 30 sensors: 4,321 frames / 129,630 observations in 15,855 ms, initialization 584 ms, rewind 3.11 ms, process RSS 382,672,896 bytes. It does not establish browser endurance or physical prediction accuracy. Simulation remains bounded to the prepared outlined area; global ecological/land-cover visualization does not establish an arbitrary-area numerical integration. Weather currently uses Open-Meteo, not WeatherAPI; Ubuntu and historical provider/model blockers remain as documented above.
+
+## Arbitrary-area / custom-hour acceptance — final sandbox-v2
+
+Compiled UI: `index-B6-qwP3H.js` / `index-BR1X36HM.css`; numerical worker: `simulation.worker-DLgWZGqL.js`. Build passed with the existing bundle-size warning. Independent verification passed **105 tests in 20 files**. The coordinator corrected a typed Buffer in a test fixture, then reran its three tests and workspace typecheck successfully. No production change followed final browser verification.
+
+Seven distinct Chrome cases passed across six initial cases, one tile-recovery case and four focused reruns. Coverage includes custom 12.5/48/1,000-hour inputs, editable legacy 0.5-hour imports, actual area preparation with four profiles, run/pause/reload, real worker reconstruction to 12.5 hours, deterministic early rewind, cancellation/failure preservation, 320/390 px controls, native 200% zoom and regional tile recovery. Deterministic weather cases use labelled external fixtures. The Carpathian area journey uses actual provider acquisition through compiled Express; its saved frontier is an explicit input fixture reconstructed by the real worker, not mocked frames or 12.5 hours of wall-clock playback. See SANDBOX_REVIEW.md.
+
+Coordinator HTTP acquisition also passed for distinct 1 km / 1,600-cell areas in the Carpathians and California. Raster URLs, checksums and elevation ranges are in `docs/evidence/sandbox-area-live.json`. A real 1,000-hour weather request returned 380 samples including a labelled constant tail after forecast coverage ended at 1,352,293.227 seconds. This does not establish a 1,000-hour provider forecast. Coordinator browser inspection covered custom hours, actual Carpathian preparation and reload, plus final desktop/mobile/native-zoom captures. Short-height legend occlusion and tile-burst/recovery findings are resolved.
+
+The simulation agent computed 12.5 hours on 40,000 prepared cells with 30 sensors: 270,030 observations generated, 129,630 retained, 512 checkpoints and approximately 88 seconds of computation. This Node benchmark uses synthetic weather and does not establish browser endurance or scientific accuracy. Longer horizons remain subject to computation time, provider coverage and representable UTC dates. No PostgreSQL, existing port-4000 service, external map files or iot changes were made for this revision.

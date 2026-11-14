@@ -1,0 +1,27 @@
+import {afterAll,describe,it,expect,vi} from 'vitest';
+import type {Sensor,ValidatedObservation} from '@dryspell/contracts';
+import {evaluateAlarm,initialAlarmState} from './alarms.ts';
+import {deriveSensorStatus} from './health.ts';
+import {makeSensor} from './domain.ts';
+import {satelliteQuery} from './satellite.ts';
+import {parseDailyRequest,runDailyPrediction} from './daily.ts';
+import {pool,databaseDiagnostics} from './db.ts';
+const epoch=Date.parse('2026-01-01T00:00:00Z');
+const observation=(time:number,values:ValidatedObservation['values'],quality:ValidatedObservation['quality']=[]):ValidatedObservation=>({id:`obs-${time}`,sensorId:'a',source:'real',recordedAt:new Date(epoch+time*1000).toISOString(),receivedAt:new Date(epoch+time*1000).toISOString(),location:{longitude:0,latitude:0},locationVersion:1,values,quality});
+describe('alarm persistence and hysteresis',()=>{
+  it('requires consecutive warnings but retains immediate critical temperature',()=>{let state=initialAlarmState();for(let t=1;t<=2;t++){state=evaluateAlarm(state,observation(t*60,{smokePct:45})).state;expect(state.level).toBe('normal');}state=evaluateAlarm(state,observation(180,{smokePct:45})).state;expect(state.level).toBe('suspicious');expect(evaluateAlarm(initialAlarmState(),observation(1,{temperatureC:70})).state.level).toBe('critical');});
+  it('needs five complete healthy recovery samples; absent channels and dropout cannot clear',()=>{let state=evaluateAlarm(initialAlarmState(),observation(1,{temperatureC:75,smokePct:60})).state;for(let t=2;t<8;t++)state=evaluateAlarm(state,observation(t,{temperatureC:25})).state;expect(state.level).toBe('critical');state=evaluateAlarm(state,observation(8,{temperatureC:25,smokePct:0},['fault'])).state;expect(state.clearCount).toBe(0);for(let t=9;t<13;t++)state=evaluateAlarm(state,observation(t,{temperatureC:25,smokePct:0})).state;expect(state.level).toBe('critical');expect(evaluateAlarm(state,observation(13,{temperatureC:25,smokePct:0})).state.level).toBe('normal');});
+  it('uses temporal trend evidence and ignores duplicate/out-of-order packets',()=>{let state=initialAlarmState();for(let t=1;t<=4;t++)state=evaluateAlarm(state,observation(t*60,{temperatureC:32+t*3})).state;expect(state.level).toBe('suspicious');expect(evaluateAlarm(state,observation(240,{temperatureC:0})).ignored).toBe(true);expect(evaluateAlarm(state,observation(60,{temperatureC:0})).ignored).toBe(true);});
+});
+describe('connection health, satellite and hardware metadata',()=>{
+  const sensor=makeSensor({name:'a',location:{longitude:0,latitude:0},expectedIntervalSec:60},'real');
+  it('keeps device connection, observation freshness and fire evidence distinct',()=>{const at=new Date(epoch+700000).toISOString();expect(deriveSensorStatus(sensor,null,null,at).state).toBe('waiting');expect(deriveSensorStatus(sensor,new Date(epoch).toISOString(),new Date(epoch+690000).toISOString(),at)).toMatchObject({state:'online',freshness:'stale'});expect(deriveSensorStatus(sensor,new Date(epoch).toISOString(),new Date(epoch).toISOString(),at).state).toBe('offline');expect(deriveSensorStatus({...sensor,enabled:false},null,null,at).state).toBe('disabled');});
+  it('validates declared hardware ranges without changing units',()=>{expect(makeSensor({name:'a',location:{longitude:0,latitude:0},hardware:{model:'test',temperatureRangeC:{min:-40,max:85}}},'real').hardware?.temperatureRangeC?.max).toBe(85);expect(()=>makeSensor({name:'a',location:{longitude:0,latitude:0},hardware:{temperatureRangeC:{min:100,max:1}}},'real')).toThrow();});
+  it('requires bounded geographic coordinates and receipt cutoffs for satellite history',()=>{expect(satelliteQuery({to:'2026-01-02T00:00:00Z',bounds:'179,-1,-179,1'}).availableAt).toBe('2026-01-02T00:00:00Z');expect(()=>satelliteQuery({bounds:'0,91,1,92'})).toThrow();expect(()=>satelliteQuery({from:'2026-01-02T00:00:00Z',to:'2026-01-01T00:00:00Z'})).toThrow();});
+  it('handles an idle PostgreSQL client failure without throwing from the emitter',()=>{const log=vi.spyOn(console,'error').mockImplementation(()=>{});expect(()=>pool.emit('error',Object.assign(new Error('test idle connection closed'),{code:'57P01'}))).not.toThrow();expect(databaseDiagnostics.lastPoolErrorCode).toBe('57P01');log.mockRestore();});
+});
+describe('bounded daily prediction job entry',()=>{
+  it('rejects arbitrary model directories, malformed features and oversized batches',async()=>{const request={region:'test',resolutionM:1000,horizonHours:24,features:[Array(13).fill(0)]};await expect(parseDailyRequest({...request,directory:'arbitrary'})).rejects.toThrow();await expect(parseDailyRequest({...request,features:[[]]})).rejects.toThrow();await expect(parseDailyRequest({...request,features:Array.from({length:4097},()=>Array(13).fill(0))})).rejects.toThrow();});
+  it('returns explicit null fallback when no promoted artifact is configured',async()=>{const previous=process.env.DRYSPELL_MODEL_DIR;delete process.env.DRYSPELL_MODEL_DIR;try{const result=await runDailyPrediction({region:'test',resolutionM:1000,horizonHours:24,features:[Array(13).fill(0)]},'job-test');expect(result).toMatchObject({id:'job-test',kind:'daily-prediction',activeModel:'physical',probabilities:null,resolutionM:1000,horizonHours:24});expect(result.fallbackReason).toContain('unavailable');}finally{if(previous)process.env.DRYSPELL_MODEL_DIR=previous;}},20000);
+});
+afterAll(async()=>pool.end());

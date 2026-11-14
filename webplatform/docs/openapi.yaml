@@ -1,0 +1,256 @@
+openapi: 3.1.0
+info:
+  title: Dryspell geographic simulator API
+  version: 1.1.0
+  description: UTC timestamps, WGS84 coordinates, Celsius, percent RH and normalized smoke index. Simulation and real telemetry are separate contexts. TypeScript domain schemas are in packages/contracts.
+servers:
+  - url: http://localhost:4000
+paths:
+  /health/live:
+    get:
+      responses:
+        '200': {description: Process is alive}
+  /health/ready:
+    get:
+      responses:
+        '200': {description: Database ready; response includes worker degradation}
+        '503': {description: Database unavailable}
+  /api/v1/auth/session:
+    get:
+      responses:
+        '200': {description: SessionInfo including CSRF token only for authenticated session}
+  /api/v1/auth/login:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: {type: string}
+                password: {type: string, maxLength: 1024}
+      responses:
+        '200': {description: HttpOnly session cookie and CSRF token}
+        '401': {description: Invalid credentials}
+        '429': {description: Login throttled}
+  /api/v1/auth/logout:
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: Session invalidated}
+  /api/v1/telemetry:
+    post:
+      security: [{device: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TelemetryPacket'}
+      responses:
+        '200': {description: Accepted or duplicate after database commit}
+        '201': {description: Accepted after database commit}
+        '400': {description: Invalid packet or unsupported channel}
+        '401': {description: Invalid/revoked ingestion credential}
+        '403': {description: Device outside credential allowlist}
+        '503': {description: Database unavailable; safe to retry same messageId}
+  /api/v1/telemetry/batch:
+    post:
+      security: [{device: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [readings]
+              properties:
+                readings:
+                  type: array
+                  maxItems: 100
+                  items: {$ref: '#/components/schemas/TelemetryPacket'}
+      responses:
+        '200': {description: Per-item accepted/duplicate/rejected results}
+  /api/v1/sensors:
+    get:
+      responses:
+        '200': {description: Registered real sensor list}
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '201': {description: Sensor and effective-dated initial location created}
+  /api/v1/sensors/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      responses:
+        '200': {description: Sensor}
+    patch:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: Updated sensor with location version}
+    delete:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: Archived by default; permanent deletion requires explicit choice}
+  /api/v1/sensors/{id}/readings:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      parameters:
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 10000}}
+      responses:
+        '200': {description: Observation history; missing values remain absent}
+  /api/v1/sensors/{id}/credentials:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '201': {description: One-time clear token; only its hash is stored}
+  /api/v1/scenarios:
+    get:
+      responses:
+        '200': {description: Scenario array}
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '201': {description: New draft scenario}
+  /api/v1/scenarios/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      responses:
+        '200': {description: Active Scenario}
+    patch:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: New draft revision; previous results preserved}
+        '409': {description: Revision conflict}
+  /api/v1/scenarios/{id}/{action}:
+    parameters:
+      - {$ref: '#/components/parameters/Id'}
+      - {name: action, in: path, required: true, schema: {type: string, enum: [run, pause, stop, clone]}}
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: Authoritative updated Scenario}
+  /api/v1/scenarios/{id}/workspace:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      responses:
+        '200': {description: WorkspaceSnapshot with environment, scenario, frame and event cursor}
+  /api/v1/scenarios/{id}/state:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      parameters:
+        - {name: at, in: query, required: true, schema: {type: number, minimum: 0}}
+        - {name: revision, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200': {description: Whole matching SimulationFrame; seeking does not advance run}
+  /api/v1/scenarios/{id}/prediction:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      parameters:
+        - {name: at, in: query, schema: {type: number, minimum: 0}}
+        - {name: revision, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200': {description: Matching estimate or null; never another revision's result}
+  /api/v1/environment:
+    get:
+      responses:
+        '200': {description: Immutable EnvironmentSnapshot including effective numerical grid and provenance}
+  /api/v1/sources:
+    get:
+      responses:
+        '200': {description: Provider status and attribution; absent credentials explicitly unavailable}
+  /api/v1/incidents:
+    get:
+      responses:
+        '200': {description: Context-scoped incidents}
+  /api/v1/incidents/{id}/{action}:
+    parameters:
+      - {$ref: '#/components/parameters/Id'}
+      - {name: action, in: path, required: true, schema: {type: string, enum: [acknowledge, confirm]}}
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: Audited incident transition}
+  /api/v1/predictions:
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '202': {description: Leased analysis job queued}
+  /api/v1/predictions/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get:
+      responses:
+        '200': {description: Job state and versioned prediction result}
+  /api/v1/sensors/status:
+    get:
+      parameters:
+        - {name: at, in: query, schema: {type: string, format: date-time}}
+      responses:
+        '200': {description: SensorStatus array; connection health and measurement freshness are distinct}
+  /api/v1/satellite:
+    get:
+      parameters:
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: availableAt, in: query, schema: {type: string, format: date-time}}
+        - {name: bounds, in: query, schema: {type: string}, description: 'west,south,east,north; crossing antimeridian supported'}
+      responses:
+        '200': {description: Up to 5000 persisted SatelliteObservation points filtered by observation and receipt times; not exact perimeters}
+  /api/v1/environments:
+    get:
+      responses:
+        '200': {description: Available immutable environmental snapshot summaries}
+  /api/v1/environment/prepare:
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '202': {description: Bounded provider acquisition job queued}
+  /api/v1/scenarios/{id}/inputs:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    post:
+      security: [{session: [], csrf: []}]
+      responses:
+        '200': {description: New immutable input snapshot and draft scenario revision for explicit weather/fuel overrides}
+        '409': {description: Expected scenario revision does not match}
+  /api/v1/predictions/daily:
+    post:
+      security: [{session: [], csrf: []}]
+      description: Administrator supplies declared 1 km/24 h features; server controls artifact directory. Maximum 4096 rows. No synthetic substitutes for absent features.
+      responses:
+        '202': {description: Daily model worker job queued; result includes promotion/domain fallback and explicit null when no model is available}
+components:
+  securitySchemes:
+    session: {type: apiKey, in: cookie, name: dryspell_session}
+    csrf: {type: apiKey, in: header, name: X-CSRF-Token}
+    device: {type: http, scheme: bearer}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string}}
+  schemas:
+    TelemetryPacket:
+      type: object
+      required: [deviceId]
+      description: At least one supported numerical or boolean smoke measurement required. Missing recordedAt is substituted and marked. No incoming coordinates or context selector accepted.
+      properties:
+        deviceId: {type: string}
+        messageId: {type: string}
+        recordedAt: {type: string, format: date-time}
+        temperatureC: {type: number}
+        humidityPct: {type: number, minimum: 0, maximum: 100}
+        smokePct: {type: number, minimum: 0, maximum: 100}
+        smoke: {type: boolean}
+        batteryVoltage: {type: number}
+        extra: {type: object}
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            retryable: {type: boolean}

@@ -1,15 +1,19 @@
-# Dryspell: IoT Fire Monitoring and Spread Prediction
+# Dryspell: Geographic Fire and Sensor Simulator
 
-English implementation plan for Codex CLI. Research checked on 13 November 2026. Expanded frontend and UX specification added on the same date.
+English implementation plan for Codex CLI. Scientific/data research checked on 13 November 2026. UI skill research and the map-simulator brief revised on 14 November 2026.
 
 ## 1. Objective and confirmed decisions
 
-Build a working web platform that receives real sensor readings, manages sensor locations, simulates wildfire and sensor behaviour, and estimates the current fire location and future spread from observations and environmental data.
+Build a geographic fire-and-sensor simulator: the physical map fills the screen, users place different working sensor objects and ignitions, run a scenario, inspect readings, and rewind time. Terrain, vegetation, water, and weather affect the simulation. The first useful interaction is placing and running objects directly on the map.
 
-The application must provide an interactive map, live updates, historical charts, a rewindable timeline, and a probability layer. Simulation must be useful for testing the detection algorithm, not just for drawing an expanding circle.
+The same platform also receives future real sensor readings, manages their locations, and estimates current fire location and future spread from observations and environmental data. Preserve live updates, historical charts, a rewindable timeline, and a probability layer without turning the main interface into a dashboard. Simulation must exercise the detection algorithm, not merely draw an expanding circle.
+
+The Packet Tracer comparison describes direct manipulation of objects and simulation controls only. Network topology, device links, protocols, radio simulation, and changes to the independent IoT project are outside scope.
 
 | Topic | Decision |
 | --- | --- |
+| Primary UI | Full-viewport physical map with a compact object palette, contextual inspector, and bottom time controls. Simulation opens first. |
+| Sensor objects | Combined, temperature-only, humidity-only, and smoke-only simulated profiles; extensible measurement capabilities. |
 | Geographic coverage | No fixed country. An administrator can select an area anywhere supported by the data providers. |
 | Initial network | Up to 30 sensors. This is the initial acceptance-test workload, not a permanent product limit. |
 | Smoke reading | A numerical index from 0% to 100%, with an optional `smoke` boolean. |
@@ -28,7 +32,7 @@ This document is a plan, not a claim that the application, model, deployment, or
 
 These choices allow implementation to proceed without further blocking questions. Expose them as configuration where appropriate:
 
-- Public read-only dashboard; administrator login for mutations.
+- Public read-only simulation/replay and live views; administrator login for persistent changes. Open on the Simulation map, with a clearly labelled prepared example when no scenario is selected.
 - English UI initially, with all user-facing strings organized for later Ukrainian translation.
 - A 5 km by 5 km initial simulation area, a 25 m simulation grid, and a 6-hour detailed forecast. Allow other areas, resolutions, and horizons through scenario settings.
 - A separate 24-hour ML forecast at its supported spatial resolution.
@@ -61,7 +65,7 @@ Use a TypeScript npm workspace within `webplatform/`; the executable services st
 | Web/API server | Express, `ws`, Zod validation, structured logging. Serve REST, static React assets, sessions, and WebSocket upgrades on port 4000. |
 | Client | React and Vite; TanStack Query for server state; TanStack Table for the sensor list, sorting, and filter state. |
 | UI foundations | Radix Primitives for accessible interactions, CSS Modules and shared CSS tokens for Dryspell's own visual system; Lucide React for one consistent icon family. |
-| Mapping | MapLibre GL JS with GeoJSON sensor layers and fixed-scale raster/grid probability overlays. Add a small custom map interaction for placing and moving sensors. |
+| Mapping | MapLibre GL JS with physical terrain/land-cover presentation, GeoJSON objects, and fixed-scale fire/probability overlays. An explicit interaction controller handles selecting, placing, and moving sensors/ignitions without conflicting with map navigation. |
 | Charts | Apache ECharts: three synchronized time series with zoom, missing-data gaps, threshold markers, and shared cursor. |
 | Database | PostgreSQL with `pg`, SQL migrations, and PostGIS for locations, areas, and spatial queries. Use one PostgreSQL container with a persistent volume. |
 | Analysis worker | A separate Node.js process for simulation, inference, environmental imports, and TensorFlow inference. |
@@ -109,7 +113,9 @@ FIRMS VIIRS detections have approximately 375 m nominal pixels, and a detection 
 
 ### Sensor record
 
-Store an immutable internal ID, unique external `deviceId`, display name, real/simulated source, coordinates, optional elevation, hardware/calibration profile, expected reporting interval, tags, enabled state, and creation/update timestamps.
+Store an immutable internal ID, unique external `deviceId`, display name, real/simulated source, coordinates, optional elevation, sensor `profileId`, declared measurement capabilities, hardware/calibration profile, expected reporting interval, tags, enabled state, and creation/update timestamps.
+
+The default simulated profile reports temperature, humidity, and smoke. Also provide temperature-only, humidity-only, and smoke-only profiles with actual channel-specific outputs. Profiles configure sample interval, noise, bias, and response settings; they are simulator configuration, not a requirement to change external hardware. Keep unsupported, missing, stale, and zero-valued measurements distinct. Real-device capabilities are configured metadata and must not cause the platform to invent readings.
 
 Administrator actions:
 
@@ -188,7 +194,7 @@ WebSocket endpoint: `/ws`, sharing the HTTP server on port 4000.
 
 Use typed envelopes containing `eventId`, monotonically ordered stream cursor, event type, context/scenario ID, event time, and payload. Events include `sensor.reading`, `sensor.status`, `sensor.updated`, `incident.updated`, `prediction.updated`, `scenario.progress`, and `source.status`.
 
-Default dashboard subscriptions cover all 30 sensors in the selected context. Support subscriptions by context/device/area without leaking simulation data into live views. Filter changes affect visibility, not whether the database records incoming measurements.
+Default workspace subscriptions cover all 30 sensors in the selected context. Support subscriptions by context/device/area without leaking simulation data into live views. Filter changes affect visibility, not whether the database records incoming measurements.
 
 On connection, establish a consistent snapshot/cursor boundary and deliver subsequent events. On reconnect, resume from a retained cursor or require a fresh snapshot. Deduplicate replayed events. Add ping/pong, exponential reconnect backoff, bounded send buffers, and slow-client handling.
 
@@ -198,7 +204,7 @@ Core entities:
 
 | Entity | Main contents |
 | --- | --- |
-| `sensors`, `sensor_locations`, `device_credentials` | Identity, effective-dated geometry, calibration, reporting intervals, authentication. |
+| `sensors`, `sensor_locations`, `device_credentials` | Identity, profile/capabilities, effective-dated geometry, calibration, reporting intervals, authentication. |
 | `telemetry`, `sensor_latest`, `telemetry_hourly` | Immutable readings, cached current values, aggregates with min/max/count and gaps. |
 | `incidents`, `incident_evidence`, `audit_log` | Alarm transitions, contributing readings, acknowledgement, administrator changes. |
 | `scenarios`, `scenario_versions`, `scenario_events` | Area, clock, random seed, ignition/weather edits, immutable revision history. |
@@ -210,311 +216,269 @@ Core entities:
 
 Index `(sensor_id, recorded_at)`, source/context/time, job status, and spatial geometry. Keep large grid frames compressed in a managed data directory with database metadata, hashes, atomic writes, and coordinated backup. Do not store a JSON object per cell per animation frame. Introduce telemetry partitioning only when measured volume warrants it [T3].
 
-## 7. Frontend design, map interaction, and UX specification
+## 7. Map simulator: frontend design and UX specification
 
-This section is a required implementation specification, not an optional styling pass. A technically functional screen is incomplete until its composition, interaction states, responsive behaviour, and visual review meet the criteria below.
+**The primary product is a minimal geographic simulator. The physical map is the workspace and background. A user places working sensor objects, places fire, runs time, and observes what happens.** This requirement supersedes the earlier monitoring-dashboard composition.
 
-### 7.1. Design skill and required workflow
+The Packet Tracer analogy applies only to choosing, placing, configuring, and running objects in a shared workspace. Do not copy its styling or implement network topology, links, routing, packet transport, radio coverage, or device firmware. Real IoT integration remains an external telemetry contract.
 
-Use **Anthropic's `frontend-design` skill** as the design workflow for frontend implementation and visual review [U1]. Its upstream source is:
+### 7.1. Design research and skill selection
 
-<https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md>
+Read [UI_DESIGN_RESEARCH.md](UI_DESIGN_RESEARCH.md) before substantial frontend work. It compares six candidates using their upstream instructions and separates visual direction, implementation, and verification. It is a project-fit assessment, not a benchmark proving which model or skill makes the best designs.
 
-Before writing frontend components, Codex must read this entire section and the complete skill. Reuse an available installation of the skill; otherwise retrieve and read its official source in the implementation environment. Record the reviewed revision or content checksum and access date in `docs/DESIGN_REFERENCES.md`. If a copy is installed, preserve its upstream licence and attribution. Reading a linked skill does not mean it has been installed in a different Ubuntu/Codex environment.
+Use a small, deliberate sequence:
 
-The project-level `AGENTS.md` connects this requirement to frontend work. The skill supplies a design process; this plan supplies Dryspell's product decisions. Resolve stylistic choices in favour of the specified monitoring workflow, readability, and accessibility. Do not add a marketing hero to the application because a general design reference discusses landing pages.
+1. **Composition:** use Anthropic's `frontend-design` [U1] with this map-simulator brief. Read the complete source and follow its relevant references. The actual landscape and object interactions are the subject-specific design material.
+2. **Focused refinement:** consult Impeccable's Operate and simplification guidance [U9] when controls become crowded or generic. Treat it as a secondary design reference, or explicitly use its full workflow if installed; do not claim to have run its tooling from reading the documentation.
+3. **Implementation review:** use Vercel's `web-design-guidelines` [U10] on the implemented frontend, followed by actual browser and Playwright checks. Code review does not establish visual originality.
 
-Use the following workflow without introducing a mandatory approval pause:
+Use only relevant guidance at each stage. Do not load every researched skill or combine competing visual defaults. UI UX Pro Max is an optional lookup for a specific interaction/chart issue; the researched Taste skill and image-led website workflows do not set this simulator's structure.
 
-1. Identify the operator's task, the information they need first, and the decisions available on each screen.
-2. Review a few relevant references: NASA FIRMS for spatial monitoring, Carbon for information and chart hierarchy, and this specification for Dryspell's identity [D5, U2]. Record useful principles rather than copying another product's screen.
-3. Define the layout and design tokens before building the whole component library.
-4. Build one representative monitoring screen with realistic sensor data, then its selected-sensor, alert, and mobile states. Use rendered browser layouts or visual wireframes rather than ASCII diagrams.
-5. Inspect actual browser screenshots and complete the primary user journeys. Correct spacing, hierarchy, legibility, and interaction problems before expanding to all screens.
-6. Apply the same system to administration, historical playback, and simulation. Repeat the visual and interaction review after integration.
+Record source URLs, reviewed revision/checksum, access date, and any unavailable tools in `docs/DESIGN_REFERENCES.md`. Preserve licences for retained packages. Reading a source is not installing it, and a local installation does not install it on the Ubuntu host. This document authorizes normal design decisions without a new approval checkpoint.
 
-The result should feel purpose-built for environmental monitoring. Avoid an interchangeable dashboard template, decorative effects unrelated to the data, and claims that visual polish guarantees prediction accuracy.
+### 7.2. Design direction and originality requirement
 
-### 7.2. Visual direction
+**Direction: a physical landscape with a small set of precise simulation instruments.**
 
-**Direction: a calm, precise field-monitoring console with the map as its main working surface.**
+Open directly onto real geography: relief, vegetation, water, place names, and the selected simulation boundary. The map fills the viewport behind the controls. Avoid a white page surrounding a map card, permanent dashboard sidebars, statistic-card grids, decorative illustrations, marketing sections, and a full-screen welcome page.
 
-Use a light, cool-neutral application shell, white inspection surfaces, restrained evergreen actions, and a low-saturation basemap. Reserve warm signal colours for temperature and fire evidence. Convey character through geographic context, typography, aligned readings, and well-composed controls.
+Distinctiveness comes from three connected choices:
 
-The initial view opens directly into monitoring. Do not add a promotional welcome screen, oversized heading, ornamental statistic cards, fake testimonials, AI-generated scenic imagery, or an animated background. Site branding is a compact Dryspell wordmark; a custom illustrated logo is a separate task.
+- Terrain and effective land cover are visible at working scale, with sensors and fire embedded in that geography.
+- The object palette, placement preview, selected-object annotation, and compact inspector share one custom symbol and alignment system.
+- The bottom transport connects fire progression, sensor detection events, and the selected moment through one readable time scale.
 
-The visual hierarchy is: **location and time context, relevant sensors/incidents, selected evidence, then advanced configuration**. Secondary information remains reachable without competing with the main task.
+Build two small studies of the **same** scenario: a narrow floating tool strip and a compact object shelf. Both must retain the full map, the same controls, and the same data. Compare the actual placement and inspection flow, then choose one. The floating strip is the default if both work equally well. Do not build two complete applications or delay implementation waiting for an unsolicited style approval.
 
-Design rules:
+Changing a font, colour, corner radius, or dark-mode flag alone does not satisfy the originality requirement. Review the chosen screen without its logo: it should still communicate a terrain-based sensor/fire simulator. Familiar usable controls are welcome; unnecessary novelty is not a goal.
 
-- Group by task and meaning. Use panels for persistent tools, rows for comparable sensors, and dialogs for focused decisions.
-- Use consistent alignment and spacing; leave breathing room around meaningful groups while keeping a useful amount of data visible.
-- Make one primary action apparent within the current task. Read-only monitoring does not need a large call-to-action button.
-- Show units, freshness, and data origin close to the values they qualify.
-- Keep risk, connection health, and selection visually distinguishable.
-- Use subtle transitions to explain a user action. Live readings should not make the entire interface flash or move.
+### 7.3. Visual system and component styling
 
-### 7.3. Design tokens and component styling
+Define semantic tokens after choosing the composition. The following are roles and constraints, not a preselected dashboard theme:
 
-Define semantic CSS variables in one token file and use them in React, MapLibre styling, and the ECharts theme. These are initial design values; refine them through browser review while preserving their roles.
-
-| Token/role | Initial value | Usage |
-| --- | --- | --- |
-| Application background | `#F4F6F8` | Shell and quiet page background. |
-| Surface | `#FFFFFF` | Inspector, dialogs, menus, and table surface. |
-| Primary text | `#18212B` | Headings, primary readings, important labels. |
-| Secondary text | `#526172` | Supporting information and timestamps. |
-| Decorative separator | `#D5DDE5` | Low-emphasis grouping; not the sole boundary of an interactive control. |
-| Control boundary | `#788696` | Input outlines and controls where a visible boundary is necessary. |
-| Primary action | `#21604B` | Main buttons and selected navigation, with readable foregrounds. |
-| Selected surface | `#E4EFEB` | Quiet selected-row or selected-tab background. |
-| Focus indicator | `#246EA5` | Clear keyboard focus ring with offset. |
-| Warning | `#8A5200` on `#FFF4D6` | Stale data and caution messages, accompanied by text/icon. |
-| Critical | `#B42332` on `#FFF0F0` | Critical evidence and destructive actions, with explicit labels. |
-| Temperature series | `#A84B15` | Temperature chart line. |
-| Humidity series | `#246EA5` | Humidity chart line. |
-| Smoke series | `#586474` | Smoke-index chart line. |
-
-Use **IBM Plex Sans** for interface text and **IBM Plex Mono** only for device identifiers, coordinates, and code-like values [U4]. Use tabular numerals for changing measurements. Keep ordinary labels in the main sans-serif family. Self-host the required font files, retain their licence, and include Latin and Cyrillic glyph coverage for future Ukrainian text.
-
-Typography starting points: 14–16 px body text, 13 px secondary metadata, 18–20 px panel titles, and 24–28 px selected readings. Prefer weights 400, 500, and 600. Do not shrink essential labels to fit; reflow the layout. Use sentence case and short concrete labels.
-
-Use a 4 px spacing basis with an intentional scale of 4, 8, 12, 16, 24, and 32 px. Default control heights are 36–40 px on desktop and at least 44 px for primary touch controls. Use roughly 6 px control corners and 10 px dialog corners. Main map/sidebar boundaries can remain square. Shadows belong mainly to floating overlays and dialogs.
-
-Use Radix Primitives for dialog, menu, popover, tabs, tooltip, and slider behaviour, then style them with the shared tokens [U3]. Prefer CSS Modules for component-specific styling and a small global reset. Keep one icon family, a consistent stroke weight, and textual labels for unfamiliar actions. A component library does not replace the design decisions in this section.
-
-Treat a dark theme as a later deliberate design task; a complete, reviewed light theme is the initial requirement. Do not implement an automatic colour inversion and call it a finished second theme.
-
-### 7.4. Information architecture and screen ownership
-
-| Screen | Primary purpose | Main interaction |
-| --- | --- | --- |
-| Monitor | Understand current or historical conditions in a selected area. | Select a sensor/incident, inspect evidence, change time or layers. |
-| Sensors | Compare and administer device records. | Search/filter/sort; open a sensor; create or edit with administrator access. |
-| Incidents | Follow suspected and confirmed events and their evidence. | Inspect the timeline and contributing observations; acknowledge/confirm as administrator. |
-| Simulations | Configure, run, and compare saved scenarios. | Place devices/ignitions, control time, compare truth and estimate. |
-| Sources and model | Understand freshness, provenance, resolution, and model status. | Inspect current inputs, missing data, and prediction limitations. |
-| Settings | Configure credentials, retention, providers, and defaults. | Administrator-only forms with clear save feedback. |
-
-Keep the active area, data context, selected sensor, filters, and time understandable while moving between views. Preserve meaningful navigation state in the URL so Back/Forward and a copied read-only link behave predictably. Never put credentials in that URL.
-
-The application has an explicit **Live**, **History**, or **Simulation** context. Selecting a future timestamp additionally shows **Forecast** and the forecast issue time. A historical or simulated display must never retain an unqualified Live badge.
-
-### 7.5. Desktop layout and responsive composition
-
-For a large desktop, use a compact top bar, narrow navigation rail, sensor/incident list on the left, central map, optional right inspector, and a bottom time bar. The top bar carries the area, context, connection summary, and account control. Navigation labels must be available on focus and in the expanded navigation.
-
-| Region | Initial sizing | Behaviour |
-| --- | --- | --- |
-| Top bar | About 56 px high | Remains stable when values update; wraps or simplifies at smaller widths. |
-| Navigation rail | About 64 px wide | A small number of destinations; expands into a labelled menu. |
-| Left list | About 288–320 px wide | Search, compact status counts, filters, and sensor/incident rows. |
-| Map | Remaining space | The largest surface when the inspector is closed; protect a useful minimum width. |
-| Right inspector | About 380–420 px wide | Opens for a selected sensor/incident; scrolls internally when needed. |
-| Time bar | About 80–96 px collapsed | Expands for event tracks and detailed playback controls. |
-
-At 1440 px and wider, the list and inspector may coexist. At 1024–1439 px, show one full side panel at a time when both would squeeze the map below roughly 560 px. Opening the inspector preserves the list state and provides a clear return action.
-
-At 768–1023 px, use an overlay drawer or bottom inspector and a collapsible list. At mobile widths, the map is the base screen and Map/List is an explicit switch; the inspector becomes a bottom sheet or full-height panel. The sheet must have buttons to expand/close, not require dragging. Preserve numeric coordinate entry and the complete administrator flow on touch screens.
-
-Test 1440×900, 1280×800, 768×1024, and 390×844, plus 320 CSS px reflow and 200% zoom. Do not create horizontal page scrolling. If a data table needs horizontal scrolling, contain it within a labelled region. Keep the timeline and selected status accessible with the on-screen keyboard open.
-
-### 7.6. Map composition, layers, and interaction
-
-The default screen is a monitoring dashboard: map, sensor list, status counts, timeline, and collapsible layer controls. An administrator can open a Simulation workspace in the same application.
-
-Map layers:
-
-- Real sensors and simulated sensors with distinct symbols and labels.
-- Device state: normal, suspicious, critical, stale, offline, disabled, and unknown.
-- Estimated current fire probability, probability of fire reaching an area by the selected time, and a separate simulated ground-truth overlay.
-- Optional NASA hotspot markers with acquisition time, source, and footprint information.
-- Optional wind arrows; animation can be added with a reduced-motion alternative.
-- Optional ambient-temperature raster, land-cover layer, and selected-area boundary.
-
-Wind and temperature overlays must use the selected timeline time and environmental snapshot. Label their source resolution and freshness; visually smooth interpolation is not new measurement precision.
-
-Use a quiet basemap with readable place names, subdued roads, and restrained vegetation colours. Keep attribution, scale, and legend visible. Sensor hit areas may be larger than their drawn symbols. Dense or overlapping sensors need an explicit disambiguation list or expansion behaviour; clicking must not select an arbitrary hidden marker.
-
-Use marker shape/outline to distinguish real and simulated devices, an inner status glyph to indicate an alert, and a separate selection ring. Critical state must remain recognizable on top of a red probability region. Keep the selected sensor identifiable even while it receives new values.
-
-Interaction rules:
-
-- A marker or list-row click opens the same inspector and synchronizes selection.
-- Preserve the current zoom and view unless the user chooses Locate, Fit area, or Follow selected sensor. Automatic updates must not repeatedly pan the map.
-- When opening an inspector, pan only as needed to keep the selected marker in the usable map area; account for panel padding.
-- Show one small hover/focus preview with name, readings, and freshness. Place detailed graphs in the persistent inspector, not in a tiny map popup.
-- Use a deliberate placement/edit mode for administrator changes. A normal click on the map must not create or move anything.
-- Layer controls show visibility, opacity where meaningful, time, and an accessible legend. Group them as Sensors, Fire, Weather, and Landscape.
-- Temperature and fire probability are mutually exclusive filled rasters by default to avoid ambiguous colours. Allow deliberate comparison through switching or synchronized views. Wind arrows can sit above either layer without overwhelming markers.
-- Distinguish predicted boundaries, satellite detections, and simulated truth by line/symbol treatment as well as colour. Truth comparison is off by default in monitoring.
-- When tiles fail, preserve the sensor list, coordinate readout, and available overlays. Show a useful map error rather than a blank application.
-
-### 7.7. Sensor inspector and chart design
-
-Clicking a sensor opens a panel with current values, last communication, source, location, quality flags, calibration, and three synchronized charts: temperature, humidity, and smoke index. Show detected alarm events, weather baseline where available, and gaps rather than fabricated connecting values. Support ranges such as 1 hour, 24 hours, 7 days, and a custom interval.
-
-Inspector order:
-
-1. Device name and ID, real/simulated label, connection health, and close/locate actions.
-2. Three aligned values with units, observation time, and freshness. Keep units visually secondary but readable.
-3. A concise alert/evidence explanation when relevant.
-4. Date-range controls and the three synchronized charts.
-5. An event list and collapsible metadata/calibration details. Administrator edit actions stay in a consistent location.
-
-Use three vertically aligned plots with a shared time axis; do not combine Celsius and two percentages on an unexplained multi-axis graph. Humidity and smoke use 0–100% scales. The temperature plot can autoscale with visible limits and explicit threshold annotations. A weather baseline uses a labelled dashed line; projected values are dashed or shaded and clearly separated from observations.
-
-Use one measurement colour consistently across value, line, tooltip, and legend. Draw chart gridlines lightly, keep axes readable, and show units. Hover, keyboard inspection, and touch inspection should reveal the same timestamp and values across all three plots. Tooltips must remain inside the visible panel.
-
-Decimation must preserve peaks and gaps. Show the selected aggregation interval and retained sample count when a long range is summarized. Do not smooth away a brief critical reading. A chart with no data must explain whether the period is empty, the device has not reported, or data could not be loaded.
-
-Live follow is enabled for the latest time range. Panning or zooming a chart pauses follow and exposes a clear Resume live action. Do not jump the chart back to now while the user is examining an earlier event.
-
-### 7.8. Sensor list, filters, and information density
-
-Use one shared filter model for map markers and the TanStack Table sensor list [T6]:
-
-- Device ID/name search, tags, real/simulated, scenario, and enabled/archive state.
-- Alarm/connection status, freshness, selected map area, and distance from an incident.
-- Temperature, humidity, and smoke ranges; missing values are a distinct option.
-- Land-cover category, time window, and evidence-quality flags.
-- Clear all, visible matching count, and URL-persisted non-sensitive filters.
-
-A compact list row shows name, status, three aligned readings, and last-seen age. Show a small set of high-value filters directly; place advanced ranges and metadata in a Filters panel with an active-filter count. Active filters appear as removable chips with an obvious Clear all action.
-
-Use stable sorting while the user is interacting. Do not reorder the list on every incoming value and move a row out from under the pointer. If an active dynamic sort has changed substantially, provide a controlled refresh or reorder at a safe interaction boundary.
-
-Display contextual counts, such as 8 of 30 sensors, and distinguish No sensors configured from No sensors match these filters. A filtered-out selected device remains in the inspector with an explanation and a Show in list action.
-
-Keep table headings visible within the table region. Right-align comparable numerical readings and use tabular numerals. Preserve full IDs and names through accessible details rather than relying on hover-only truncation. Thirty devices do not require an elaborate virtualized interface unless measured performance justifies it.
-
-### 7.9. Timeline and playback UX
-
-The time bar contains a readable date/time and time zone, play/pause where applicable, step controls, a slider, playback speed for simulation, and Return to live. Context is visible even when the bar is collapsed.
-
-Use separate, labelled tracks for sensor alarms, ignition events, and available prediction frames. Differentiate recorded history from forecast time using a background boundary and a Now/Forecast start marker. Keep tick density appropriate for the current range.
-
-Dragging previews the selected timestamp promptly. Debounce expensive state requests, cancel obsolete requests, and apply only the response matching the current cursor/context. Preserve the previous complete frame with a Loading selected time indicator until the new frame is ready; do not assemble a map from mismatched times.
-
-All linked views must agree on the selected context and time: marker readings, chart cursor, weather layer, probability legend, and incident evidence. Historical data arriving over WebSocket may update the stored history, but must not yank the viewer back into live mode.
-
-Provide keyboard slider operation, a direct date/time input, and controls to jump to the previous/next event. State the current simulation speed plainly. The viewer's playback control must not unexpectedly pause or rewind another viewer's scenario run.
-
-### 7.10. Administrator and scenario workflows
-
-**Add a sensor:** choose real or simulated, enter the basic identifying fields, select a map location or enter coordinates, review a visible pending marker, and save. Show field labels and units persistently. After success, select the saved device and confirm it in the list. A failed save retains the entered information.
-
-**Move a sensor:** enter Edit location, show the original and proposed position, allow drag or coordinate entry, and provide Save location and Cancel. Ordinary navigation stays separate from editing. Cancel restores the original marker; Save failure does not falsely present the proposed position as persisted.
-
-**Archive or delete:** use explicit wording with the device name and the effect on history. Keep archive the convenient default for devices with readings. Permanent deletion requires the deliberate confirmation already specified in section 5. Do not use the same button appearance for Locate and Delete.
-
-**Create a scenario:** select an area, set its start time/environmental inputs, place simulated sensors, add ignition events, and run. Show these as meaningful stages, preserve drafts, and explain the next incomplete step. Advanced fuel and uncertainty settings live in expandable groups rather than blocking the basic setup.
-
-**Compare a scenario:** expose an explicit Truth and estimate comparison. Start with aligned layer switching; add synchronized split views only if space and interaction remain clear. Both views must share the same scenario revision and time.
-
-**Session expiry:** explain that editing requires login again, preserve the unsaved draft, and restore the intended form after successful login. Do not lose a user's entered coordinates or scenario settings.
-
-### 7.11. Alerts, failures, loading, and empty states
-
-Do not merge three separate facts into one badge: a device can be online, reporting an abnormal value, while the prediction worker is delayed. Present device connection, fire evidence, and forecast freshness separately.
-
-| State | Required presentation and recovery |
+| Role | Requirement |
 | --- | --- |
-| First load | Stable panel/chart placeholders; show the application structure immediately. Avoid a full-screen spinner for unrelated requests. |
-| No devices configured | Short explanation and an administrator Add sensor action; viewers see a clear read-only message. |
-| No filter matches | Keep active filters visible and offer Clear filters. |
-| Device has never reported | Show Waiting for first reading; do not draw zero-valued charts. |
-| Stale device reading | Retain the last value with its timestamp and a stale label. |
-| WebSocket reconnecting | Quiet persistent connection status and last update; continue showing retained data. |
-| Weather unavailable | Show cached-data age or an unavailable state; explain which forecast inputs are affected. |
-| Analysis running/late | Keep the previous result with its issue time and an Updating indicator; allow cancellation of an explicit long job. |
-| Critical reading | Persistent in-app alert and incident entry with device, value, time, and an Inspect action. |
-| Save failed | Inline error near the affected form, preserved input, and a meaningful retry action. |
-| Map/WebGL unavailable | A functional sensor list, charts, and clear explanation of the unavailable map view. |
-| Permission denied | Clear explanation and login/return action without pretending the mutation succeeded. |
+| Main background | Actual geographic map data, extending to all viewport edges. No generated landscape image or blank white canvas. |
+| Landscape | Readable relief and restrained natural land-cover colours. Analytical land-cover tint must correspond to the effective scenario inputs. |
+| Floating controls | Compact opaque or nearly opaque mineral/charcoal surfaces with clear text. Verify contrast over bright water, dark woodland, and fire overlays; do not depend on blur. |
+| Selection | One cool accent plus a distinct ring/outline, separate from heat and probability colours. |
+| Fire and probability | Warm semantic scale with a fixed labelled legend; active fire, burned land, and estimated probability have distinct treatments. |
+| Sensor readings | Consistent temperature, humidity, and smoke colours in markers, values, and charts; always include units. |
+| Typography | One readable interface family, with optional monospace for IDs/coordinates only. Tabular numerals for changing readings. IBM Plex [U4] is a candidate, not a substitute for art direction. |
+| Geometry | Compact grouped tools, deliberate separators, and one context panel. Avoid a separate rounded card around every value. |
 
-Critical alerts must not disappear as short toasts. Acknowledging an alert records that it was seen; it does not clear measurements, stop the simulated fire, or confirm a real incident. Confirmation, acknowledgement, and resolution use distinct labels and events.
+Create matching CSS tokens, MapLibre styles, and ECharts themes. Self-host licensed font subsets with Latin and Cyrillic support. Start with 14–16 px ordinary text, readable secondary metadata, and a 4 px spacing basis; reflow rather than shrinking important labels.
 
-Deduplicate repeated alerts from the same continuing condition. Avoid a new toast for every sensor tick. Audio notifications are off by default and are not required to recognize a critical state.
+Use Radix Primitives for interaction behaviour [U3], styled for this product through CSS Modules. Keep a consistent icon family. Sensor-type symbols may be simple custom SVGs sharing the same stroke and proportions. Icons have accessible names and discoverable labels. Only actual sensor identities and meaningful time ticks receive numerical labels.
 
-Use concrete copy such as Last reading 8 minutes ago, Forecast updated 2 minutes ago, Changes could not be saved, and View incident. Avoid generic success messages that conceal what changed. Developer details such as API route names and worker implementation belong in diagnostics, not the primary operator flow.
+Motion explains placement, selection, and time progression. Do not add cinematic camera movements, mandatory entrance animations, decorative particles, or glowing alarms. Wind animation is optional and has a static alternative.
+
+### 7.4. One workspace and explicit contexts
+
+The entry route opens the **Simulation** map, restoring the last scenario or showing a clearly labelled sample scenario. A new blank scenario is also available. Public visitors can inspect and replay published/saved scenarios; administrator login enables persistent edits.
+
+Keep a compact context selector for **Simulation / Live / History**. These share the map, selection, charts, and layers. Live telemetry remains supported, but the application does not open on a separate dashboard.
+
+| Workspace state | Visible controls and content |
+| --- | --- |
+| Nothing selected | Map, compact scenario/context control, object tools, transport, essential map controls. |
+| Placing an object | Active tool label, placement preview, cancel action, and brief placement guidance. |
+| Sensor selected | Selected marker and one inspector with readings, plots, and relevant edit actions. |
+| Ignition selected | Ignition position, start time, state, and scenario edit actions. |
+| Inspecting terrain | Local land cover, elevation/slope, fuel assumption, source resolution, and missing-data state. |
+| Running or replaying | Fire progression, changing sensor readings, current time/speed, and optional estimate comparison. |
+
+Open Sensors, saved scenarios, incidents, source details, and settings from a compact menu into a drawer or focused dialog. Do not introduce six permanent navigation destinations or leave a sensor table open by default. Preserve map camera, selection, and time when opening and closing tools.
+
+Store non-sensitive view state in the URL where useful. Show the context and scenario revision clearly. A future estimate includes its issue time; simulated readings never carry an unqualified Live label.
+
+### 7.5. Layout and responsive behaviour
+
+The map canvas occupies the full viewport. UI controls float over it; there is no page gutter, card container, or empty application background.
+
+| Region | Desktop starting point | Behaviour |
+| --- | --- | --- |
+| Scenario/context control | Compact top-left group, about 40–48 px high | Scenario name, context, save state, and menu. Account controls stay secondary. |
+| Object tools | Narrow floating strip, roughly 48–56 px wide | Select, Add sensor, Add fire, Inspect terrain. Sensor profiles expand from Add sensor. |
+| Environment/layers | Small top-right group | Wind summary and Layers; detailed settings open on demand. |
+| Selection inspector | One panel, about 340–400 px wide | Closed initially; sensor/ignition/terrain content shares the same panel. |
+| Transport | Bottom strip, roughly 64–80 px high | Run/playback controls, time, speed, and scrubber; event tracks expand on demand. |
+| Map utilities | Small unobtrusive group | Zoom, north/reset bearing, scale, attribution, and active-layer legend. |
+
+At 1440×900 and 1280×800, target at least 80% unobscured map area with no selection and 60% while inspecting an object. These are composition targets checked on captures, not an excuse to shrink text or hide required controls. Keep the selected object and a useful surrounding area visible.
+
+Only one major inspector/list drawer is open at a time. On tablets, collapse tool labels or use a shelf. On mobile, use a compact top control, an expandable tool shelf, and an inspector bottom sheet with explicit expand/close buttons. A tall chart sheet may temporarily cover more map, but closing it restores the same position and time.
+
+Check 1440×900, 1280×800, 768×1024, and 390×844, plus 320 CSS px reflow and 200% zoom. Preserve touch placement and numeric coordinate entry. Avoid horizontal page scrolling and collisions between the sheet, transport, attribution, and on-screen keyboard.
+
+### 7.6. The physical map must affect the simulation
+
+Visual terrain is a required working input, not scenery. Map imagery and numerical environmental data have separate responsibilities:
+
+| Visible feature | Numerical source | Effect in the baseline |
+| --- | --- | --- |
+| Woodland, grassland, scrub/mosaic | WorldCover and bounded OSM enrichment [D7, D8] | Fuel profile, burnability, moisture assumptions, and spread response. |
+| Hills and slopes | Copernicus DEM [D9] | Elevation, slope, aspect, and directional spread adjustment. |
+| Water and designated non-burnable areas | Effective land-cover/barrier masks | Block local surface-fire propagation. |
+| Wind direction and speed | Weather snapshot or labelled scenario override [D1–D3] | Directional spread and smoke transport. |
+| Temperature, humidity, recent rain | Same time-aligned weather snapshot | Ambient sensor readings and documented moisture/drying effects. |
+
+Use a consistent path: **provider data → immutable environment snapshot → effective simulation grid → engine outputs and map overlays**. Include environment ID, scenario revision, valid time, and resolution in the response contract. The terrain inspector reads the effective grid used by that run.
+
+The default physical basemap shows relief and recognizable geography. Within the active area, provide the effective land-cover/fuel overlay so the user can inspect what the engine actually uses. If imagery and older classified data disagree, identify the source/date difference and expose the effective input rather than silently inferring fuel from image colours.
+
+Switching basemap style, hiding a layer, or changing hillshade opacity must not alter the simulation. An administrator's scenario-only fuel or weather override changes the model input, is visible as an override, and creates a new revision. Hiding trees visually does not remove fuel.
+
+Display dataset resolution and unknown cells honestly. Do not substitute flat terrain or grass everywhere without an explicit fallback label. A new area shows preparation/coverage state before Run; allow a clearly labelled prepared sample to demonstrate the workflow when providers are unavailable.
+
+Start with a top-down physical map and hillshade. 3D terrain is optional presentation, not a prerequisite. Do not treat every road as a perfect firebreak or implement network/radio physics. The analytical rules and their limitations remain in section 9.
+
+### 7.7. Sensor objects, fire objects, and direct manipulation
+
+Provide working simulated sensor profiles, not several decorative icons for the same behaviour:
+
+| Palette profile | Reported measurements |
+| --- | --- |
+| Combined sensor | Temperature, humidity, and smoke index; the default. |
+| Temperature sensor | Temperature only. |
+| Humidity sensor | Humidity only. |
+| Smoke sensor | Smoke index, with an optional configured boolean threshold. |
+
+Profiles declare supported measurements, units, sample interval, bias/noise, and response settings. Missing or unsupported channels remain distinguishable from zero. All profiles use the same scenario clock and sensor-response engine. The inference engine must handle partial evidence. New capabilities can be added through configuration without inventing or modifying physical hardware.
+
+Primary administrator journey:
+
+1. Open or create an area on the map; prepare its environment with sensible defaults.
+2. Choose Add sensor and a profile; click the map to place it. Generate an editable default name and ID. Keep detailed calibration optional.
+3. Choose Add fire and click a burnable point. Default the ignition to scenario start; expose scheduled ignitions in its properties.
+4. Press Run. Sensor readings and fire advance from the same simulation state.
+5. Select a sensor to inspect its response, pause, seek backward, or compare the estimated fire with simulated truth.
+
+A simulation placement can save immediately with a visible pending state; do not open a mandatory long form per object. Failed persistence leaves a recoverable pending placement and does not claim success. Real-sensor creation additionally requires its external device ID.
+
+Use explicit tool state: Select, Place sensor, Place ignition, Inspect terrain, or Move selected object. Escape cancels the active placement/move; clicking ordinary empty map deselects. Map panning and control clicks never create objects. Drag placement may be an enhancement, but click-to-place and coordinate entry must work.
+
+Moving an existing object shows its original/proposed position and Save/Cancel. Provide Undo for draft placement/edit operations; undoing a committed change creates a recorded revision, never deletes telemetry history. Editing a completed/running scenario creates a new draft revision; show that it must be rerun. Warn about ignition on unknown terrain and reject ignition on a confirmed non-burnable cell.
+
+Use marker symbols for profile, shape/outline for real versus simulated, and a separate selection ring. An alert stays recognizable over red fire shading. Overlapping sensors open an explicit selection list. Auto-updates never reposition the camera unless Follow was deliberately enabled.
+
+### 7.8. Selected-object inspection, charts, and filters
+
+Keep detailed information contextual. A sensor inspector contains:
+
+1. Name, profile, source/context, coordinates, and observation time.
+2. Three aligned reading slots with units. Unsupported channels say Not supported; missing measurements say No reading.
+3. Temperature, humidity, and smoke history on aligned plots, with only supported channels plotted.
+4. Alarm/detection events and an optional evidence explanation.
+5. Collapsed metadata/calibration and administrator edit actions.
+
+Use a shared time axis and cursor. Keep humidity/smoke on 0–100 scales; temperature shows its units and visible scale. Mark the weather baseline and alarm threshold. Preserve peaks, missing-data gaps, and freshness; do not interpolate misleading readings. Historical range controls are available when needed. Live follow pauses when the user deliberately explores older data.
+
+Use one shared filter model for the map and an optional TanStack Table sensor drawer [T6]. Support ID/name, profile, source/context, state/freshness, measurement ranges, map area, tags, and land cover. Advanced filters stay behind Filters. Show active-filter count, matching count, and Clear all; never hide a selected object without explaining the filter mismatch.
+
+Thirty sensors do not require a permanently visible fleet-management table. Keep the optional list usable when WebGL fails and provide keyboard selection and accessible chart-value tables.
+
+### 7.9. Time, fire visibility, and prediction layers
+
+The bottom transport is always easy to reach. Include current timestamp/time zone, run or playback state, speed, step controls, and a rewindable slider. Expand event tracks for ignition and sensor-detection times on demand.
+
+Separate authoritative scenario execution from a viewer's replay cursor. Administrator Run/Pause run affects that scenario; replay Play/Pause only moves the viewer's recorded-time cursor. Label these states clearly and never pause another user's run merely because a viewer inspects history. Playback speed must not change the deterministic fire or sensor results.
+
+While scrubbing, preview the target time promptly, cancel obsolete requests, and apply a complete matching frame. Map fire, sensor readings, chart cursor, weather, and estimates must share scenario/revision/time. Incoming live telemetry never pulls a historical viewer back to now.
+
+In Simulation, show simulated fire by default so the experiment is observable. Distinguish active burning from burned area. Offer an explicit **Fire / Estimate / Compare** control when estimates exist. Keep simulated truth out of the inference inputs.
+
+Prediction choices distinguish current burning, reached-by-time, and possible origin. Use fixed probability legends and clear unknown regions. Optional wind, temperature, satellite detections, and analytical landscape layers live under Layers. Temperature and fire-probability filled rasters are mutually exclusive by default; wind vectors can accompany either. Satellite points are not exact fire perimeters.
+
+### 7.10. Saving, permissions, and recovery
+
+Persistent placements, moves, scenario edits, real-device metadata, and administrator settings require server-enforced login. Anonymous users can inspect and replay permitted data. A small login action explains why editing is unavailable without replacing the map with a login page.
+
+Show scenario draft/saving/saved/error state. Keep failed edits available for correction or retry. Preserve drafts through session expiry and restore their context after login. Archive real sensors with history by default; deliberate permanent deletion names the device and affected data.
+
+Creating a scenario uses one short setup panel and direct map placement. Advanced fuel/model settings remain collapsed. Saved scenarios open from a menu; they are not a separate card-gallery home page.
+
+### 7.11. Loading, empty, failure, and alert states
+
+| State | Required behaviour |
+| --- | --- |
+| First load | Keep the map/workspace structure visible with a bounded loading state. |
+| Empty scenario | Show brief Add sensor / Add fire guidance on the map; leave tools usable. |
+| Environment preparing | Show progress/coverage and explain Run availability. |
+| Unknown terrain or stale weather | Identify the missing/stale input and any explicit fallback affecting the run. |
+| No readings yet | Waiting state, without fabricated zero charts. |
+| Disconnected real sensor | Preserve last reading and time, separate from fire evidence. |
+| Reconnecting socket | Keep the current map and selected time; reconnect without duplicate events. |
+| Save failed | Preserve the pending object/draft and expose retry/cancel. |
+| Prediction delayed | Keep the previous result with its issue time and update state. |
+| Critical reading | Persistent sensor/event indication with an Inspect action; no per-tick toast flood. |
+| Map unavailable | Usable sensor list/charts, coordinate input, and a clear map error. |
+
+Distinguish connection health, alarm severity, and model freshness. Acknowledgement does not clear measurements or confirm a real wildfire. Keep provider/API/worker details in source/diagnostic panels rather than the main tool labels.
 
 ### 7.12. Accessibility and motion
 
-Provide numeric coordinate entry and a table-based selection alternative to map dragging. The timeline, dialogs, filters, and charts must be usable with a keyboard. Show textual statuses and patterns as well as colour.
+Support the complete core flow with keyboard controls and numeric coordinate entry. Provide readable labels, accessible names, focus restoration, and a list alternative to spatial selection. Shortcuts must not intercept text-field typing.
 
-Target WCAG 2.2 AA for the application UI. Check actual rendered text/background combinations, aiming for at least 4.5:1 for normal text and 3:1 for large text; test meaningful graphical objects and control boundaries separately [U5]. Do not assume that a colour passing on white will pass over a map.
+Target WCAG 2.2 AA [U5–U7]. Check actual text and controls over varied terrain backgrounds. Use at least 24×24 CSS px targets or the applicable spacing accommodation; prefer roughly 44×44 px for primary touch actions. Focus stays visible above panels and transport controls.
 
-Use a visible focus indicator that is not covered by sticky headers, drawers, or the timeline [U7]. Restore focus when a dialog closes. Ensure controls have accessible names, form errors are associated with fields, and selected/expanded states are conveyed programmatically.
+Colour never carries status alone. Fire, estimate, sensor profile, selection, and unknown data need complementary symbols, boundaries, or text. Respect reduced-motion preferences and provide static wind vectors. Announce meaningful state changes, not every simulated sample.
 
-Use at least 24×24 CSS px targets or the relevant spacing accommodation, with approximately 44×44 px touch targets as the product preference [U6]. Map markers may use transparent hit areas, with an alternative list for densely packed devices.
+### 7.13. Frontend boundaries and state ownership
 
-Use polite live announcements for important status changes, not for every incoming measurement. Expose chart values and event history through accessible text/table alternatives. Hover-only tooltips are insufficient.
-
-Use restrained CSS transitions, approximately 120–180 ms for controls and 180–240 ms for panels. Respect `prefers-reduced-motion`; disable particle wind animation and unnecessary transition movement when requested. Never use flashing or perpetual pulsing as the only alarm signal.
-
-### 7.13. Frontend implementation boundaries
-
-Keep the UI modular around product behaviour:
-
-| Module/component family | Responsibility |
+| Module | Responsibility |
 | --- | --- |
-| `AppShell`, `AreaSwitcher`, `ContextHeader` | Navigation, responsive composition, area/context/time identity. |
-| `MonitoringMap`, `LayerControls`, `MapLegend` | Map lifecycle, layers, marker interaction, and fixed semantic scales. |
-| `SensorList`, `SensorFilters`, `SensorInspector` | Shared selection/filter state and device evidence. |
-| `TelemetryCharts`, `RangePicker`, `ReadingSummary` | Synchronized historical and current measurements. |
-| `TimeController`, `EventTrack`, `PlaybackControls` | Viewer cursor, history/forecast separation, scenario playback. |
-| `IncidentPanel`, `ConnectionStatus`, `SourceStatus` | Incident evidence and independent freshness/health states. |
-| `SensorEditor`, `LocationEditor`, `ScenarioEditor` | Validated drafts, explicit mutations, and recoverable failures. |
-| Shared UI primitives | Buttons, fields, menus, dialogs, badges, tooltips, and consistent focus/error states. |
+| `SimulationWorkspace`, `ContextControl` | Full-map composition, context, scenario, and revision identity. |
+| `TerrainMap`, `LayerControls`, `MapLegend` | Map lifecycle, physical/analytical layers, overlays, and legend. |
+| `ObjectPalette`, `PlacementController` | Sensor profiles, ignition placement, selection/move modes, pending edits. |
+| `ObjectInspector`, `TerrainInspector` | Contextual properties and effective environmental inputs. |
+| `SensorInspector`, `TelemetryCharts` | Readings, supported channels, history, evidence. |
+| `Timeline`, `PlaybackController` | Run state, viewer cursor, events, and synchronized frames. |
+| `SensorDrawer`, `ScenarioMenu`, `SettingsDialog` | Secondary list, saved scenarios, and configuration. |
 
-Use TanStack Query for server-owned resources and keep transient view state separate: selected sensor, open panel, map camera, filters, and time cursor. One shared controller owns the selected time/context; components must not invent their own independent current time.
+Use TanStack Query for server data. Separate transient selection, camera, active tool, open panel, and viewer cursor. One controller owns context/time; another explicit state machine owns placement, so overlapping handlers cannot create an object while panning.
 
-Keep the MapLibre instance mounted during ordinary telemetry updates. Update source data and relevant layers instead of rebuilding the map. Patch only affected sensor state, clean up subscriptions, and batch visible updates so WebSocket traffic does not rerender every chart and panel.
+Keep MapLibre mounted, patch source data, batch frame updates, and clean up subscriptions. Cancel stale queries: a late response for sensor A cannot overwrite sensor B. Do not rebuild terrain layers for every telemetry sample.
 
-Cancel stale history/prediction queries. A late response for sensor A must not replace the inspector after the user has selected sensor B. Use request keys containing sensor/context/time/revision as appropriate.
+The first implementation should demonstrate the complete place → run → read → rewind flow. Development fixtures may support composition, but final acceptance requires real application persistence, the simulation worker, WebSocket updates, and charts wired together.
 
-Persist harmless viewing preferences, such as layer choice and panel size, locally. Keep authentication secrets out of client persistence. Default to confirmed server responses for important mutations; if optimistic UI is used, implement visible rollback and error recovery.
+### 7.14. Deliverables and design gates
 
-### 7.14. Design deliverables and review gates
+Implementation must produce:
 
-Frontend implementation must produce:
+- `docs/DESIGN_REFERENCES.md`: reviewed skill sources, chosen composition, rejected alternative, and font/icon/data licences.
+- `docs/DESIGN.md`: the selected canvas composition, semantic tokens, object symbols, control states, and responsive rules.
+- Browser captures of empty placement, selected sensor, running fire, terrain inspection, replay/estimate comparison, and mobile use.
+- `docs/UX_REVIEW.md`: actual journeys, viewport checks, visual defects/fixes, and remaining limitations.
 
-- `docs/DESIGN_REFERENCES.md`: selected skill source/revision, a small set of reference principles, font/icon licences, and reasons for the visual direction.
-- Shared CSS design tokens, a chart theme, and matching map-layer style definitions.
-- A component-state gallery covering buttons, fields, statuses, dialogs, empty/error states, and keyboard focus. It may be a development-only route; a separate component service is not required.
-- Browser captures of monitoring overview, selected sensor, critical incident, historical replay, scenario editing, and mobile inspection using deterministic fixtures.
-- `docs/UX_REVIEW.md`: reviewed viewports, completed user journeys, discovered issues and fixes, accessibility checks, and outstanding limitations.
+**Composition gate:** the initial screen is an expansive physical map with a small toolset, not a dashboard with a large map card.
 
-Review each screen with the following questions:
+**Identity gate:** the design has a coherent object-symbol system, placement/selection treatment, and terrain/time presentation. A generic dashboard recoloured green or black fails even if its controls function.
 
-1. Can an operator identify the area, time, live/history/simulation context, and data freshness without opening settings?
-2. Is the most relevant observation easy to find, with units and a clear next action?
-3. Is the map usable after a panel opens, and can the selected device still be located?
-4. Do typography, spacing, controls, charts, and map symbols follow one coherent system?
-5. Are uncertainty, missing values, stale data, and forecasts visibly distinguishable?
-6. Does every visible control work, including cancellation, failure recovery, keyboard operation, and mobile interaction?
+**Interaction gate:** every visible primary tool works; the user completes placement, ignition, run, inspection, and rewind without navigating away from the map.
 
-Rate hierarchy, composition, consistency, readability, interaction clarity, and responsive behaviour from 0 to 4 during review. Each category must reach at least 3 before frontend sign-off, with no blocking usability or accessibility defects. This is a structured internal critique, not a claim that visual quality can be proven by an automated score.
+**Environment gate:** shown effective terrain agrees with the run's inputs, and changing those inputs changes the model as specified. A decorative terrain background fails.
 
-### 7.15. Visual and usability acceptance scenarios
+**Quality gate:** no blocking keyboard/touch, contrast, overlay-collision, unreadable-chart, or stale-context defects.
 
-Use realistic deterministic fixtures: a 30-device overview with normal, stale, offline, missing, and critical states; long names and IDs; zero and 100% smoke; high temperature; absent weather; and an active filter. Keep sample data clearly identified.
+Review the first rendered composition before expanding secondary UI; revise the structure if it fails. Perform another complete review after integration. Record remaining issues honestly; do not substitute an automated screenshot match or a subjective 10/10 score for these gates.
 
-Required browser journeys:
+### 7.15. Browser acceptance journeys
 
-- Open monitoring, find a named device, inspect all three measurements, and return to the overview without losing the map position.
-- Open a critical incident, identify contributing sensors and timestamps, then acknowledge it as administrator without removing the evidence.
-- Add a sensor, cancel a location change, save a different location, reload, and verify the correct persisted position and feedback.
-- Apply several filters, select a device, change a filter so it no longer matches, and recover through the inspector's Show in list action.
-- Scrub into history while real packets continue to arrive; verify the display remains consistently historical until Return to live is used.
-- Run a scenario, change playback speed, seek backward, and compare truth and estimate at the same timestamp.
-- Interrupt WebSocket/network access, inspect retained data and reconnect status, restore access, and verify recovery without duplicate alerts or context loss.
-- Repeat the main monitoring and editing flows with keyboard-only input and on a touch-sized viewport.
+Use a prepared, attributed landscape fixture with grassland, woodland, a slope, and a water barrier. Seed realistic sensor states and deterministic time.
 
-Use Playwright screenshot comparisons for stable, reviewed states [U8]. Freeze time, seed data, use fixed map fixtures/camera, wait for fonts and chart rendering, and disable nonessential animations in those tests. Run comparisons in a consistent browser/OS environment. Do not mask the sensor markers, probability layer, or key controls to make a defective screenshot pass.
+- From the map, place combined, temperature-only, humidity-only, and smoke-only sensors; reload and verify profiles, locations, and supported channels.
+- Place an ignition, run, inspect gradual heating and downwind smoke, pause/replay, seek backward, and reproduce the same readings.
+- Inspect a terrain point and verify that its visible class/slope and snapshot ID match the engine inputs.
+- Compare otherwise identical runs with changed wind, fuel, or slope; verify the documented directional/arrival-time differences. Hiding the landscape layer must leave results unchanged.
+- Attempt ignition on water; receive useful feedback and keep the placement tool usable.
+- Cancel placement/movement, undo a draft edit, recover a failed save, and verify that panning or clicking the toolbar never places an object.
+- Change a completed scenario; verify a new draft revision and no reuse of incompatible old frames.
+- Switch Fire / Estimate / Compare without leaking ground truth to inference or mixing time/revision.
+- In Live, ingest a real API packet, inspect charts, and explore history while new data continues to arrive.
+- Repeat the main flow on keyboard and touch; verify map visibility, focus, and inspector recovery.
 
-Inspect the first screenshot baselines manually. A screenshot matching an unreviewed baseline does not establish professional design. Update baselines only after checking the actual visual change and preserving the behavioural tests.
+Use Playwright against the built app [U8]. Freeze time and environmental/map fixtures for screenshot baselines. Review the first captures manually, keep key objects and overlays unmasked, and retain behavioural checks alongside visual comparisons. No application-browser checks are claimed by this planning document.
 
 ## 8. Deterministic simulation and time controls
 
@@ -535,7 +499,7 @@ Reproducibility requirements:
 
 ### Simulated sensor response
 
-For every sensor, interpolate the frozen weather data at its location and simulated time, then add persistent device bias and temporally correlated noise. Begin with configurable example noise of about plus/minus 0.5 degrees Celsius and plus/minus 3 humidity percentage points; these are scenario settings, not hardware accuracy claims.
+For every sensor, interpolate the frozen weather data at its location and simulated time, then add persistent device bias and temporally correlated noise. Calculate the environmental response consistently but publish only channels supported by that sensor profile; a smoke-only sensor must not contribute invented temperature evidence. Begin with configurable example noise of about plus/minus 0.5 degrees Celsius and plus/minus 3 humidity percentage points; these are scenario settings, not hardware accuracy claims.
 
 Use distance to the **active fire front**, not distance to the original ignition point. The requested 50 m response radius is a tunable simulation assumption.
 
@@ -559,6 +523,10 @@ Implement a transparent surface-fire baseline before training ML. Use Rothermel'
 ### Spatial representation
 
 Use a local metric grid with fuel, moisture state, elevation/slope, fire arrival time, burning duration, remaining fuel, and state: unburned, burning, burned out, or non-burnable. The initial 25 m grid is computational resolution, not a claim of 25 m real-world prediction accuracy.
+
+The grid and terrain inspector share the same immutable environment snapshot and effective fuel overrides. Store its projection, extent, cell size, source/no-data masks, class-to-fuel mapping, and checksum. Map style, zoom, and layer visibility are presentation settings and must never enter simulation calculations. Replacing a numerical environmental input creates a new scenario revision.
+
+Validate landscape behaviour with controlled fixtures: water blocks local spread, a slope changes the expected directional travel time, and changing a configured fuel profile changes rates according to that profile. Do not assume all forest spreads faster or slower than all grassland. Prevent diagonal shortcuts across non-burnable barriers when constructing grid neighbours.
 
 Propagate using directional edge travel times or a numerical arrival-time/front method. Recompute rates as weather changes. Use a time step that cannot skip entire grid cells at the highest local spread rate; check convergence with a smaller step and finer grid. Avoid visible square-grid bias and zero-delay propagation through many cells in one update.
 
@@ -758,9 +726,9 @@ Write tests around observable behaviour and scientific invariants. A passing bro
 | CRUD | Login, create sensor on map/by coordinates, edit, cancel movement, save movement, reload, archive/restore, permanent-delete confirmation, correct historical locations. |
 | Live updates | Inject telemetry through the real API and see marker, list, charts, and alerts update without reload; reconnect and recover missed events without duplication. |
 | Charts and filters | All three measurements, custom intervals, missing-data gaps, synchronized cursors, map/list filter agreement, URL state, clear-all and empty states. |
-| Simulation | Add sensors/ignitions, gradual heating inside the configured radius, early downwind smoke, 70-degree critical alarm, burnout, pause/play/speed/seek. |
+| Simulation | Place each sensor profile and ignitions directly on the map; supported-channel outputs, gradual heating, early downwind smoke, critical alarms, burnout, run/replay controls, deterministic seek, and revision-safe editing. |
 | Determinism | Same seed/config/input snapshots give the same scenario; seek/replay and uninterrupted runs agree within declared numerical tolerance. |
-| Physics | Wind-from conversion, calm symmetry, faster downwind than upwind travel under equal conditions, barriers, slope direction, moisture sensitivity, grid/time-step convergence. |
+| Physics | Wind-from conversion, calm symmetry, faster downwind than upwind travel under equal conditions, barriers including diagonal crossings, slope direction, configured fuel effects, moisture sensitivity, grid/time-step convergence, and map/engine snapshot agreement. Layer visibility and basemap changes must not affect outputs. |
 | Inference | Timing of multiple detections changes the origin posterior; no truth access; healthy negative observations constrain hypotheses; faulty/stale sensors do not force certainty. |
 | Temporal integrity | Replay before an alert does not use later readings; operational replay excludes late-arriving data and future weather runs; live updates continue while a viewer examines history. |
 | Probability rendering | Fixed 0–1 legend, distinct unknown state, current-burning versus reached-by-time distinction, no automatic density scaling. |
@@ -768,7 +736,7 @@ Write tests around observable behaviour and scientific invariants. A passing bro
 | ML | Reproducible preprocessing, matching train/inference units, event/geographic split checks, model load, calibration metadata, baseline comparison, unavailable/out-of-domain fallback. |
 | Deployment | Fresh install, repeated install, database persistence, worker crash/restart, service reboot startup, static SPA routing, port binding, backup and restore. |
 | Usability | Keyboard navigation, visible focus, accessible dialogs, colour-independent statuses, desktop and narrow-screen layouts, no unexpected browser errors. |
-| Visual quality | Section 7 token consistency, reviewed desktop/mobile screenshots, readable map overlays, stable panel composition, complete loading/error/empty states, and recorded UX review. |
+| Visual quality | Section 7 composition/identity gates: full physical-map workspace, minimal tools, working object placement, readable overlays/charts, contextual inspection, reviewed desktop/mobile captures, and complete loading/error/empty states. A recoloured dashboard fails. |
 
 Use Playwright against the built React app and actual Express server, with a real test PostgreSQL instance. Mock external weather/map/satellite responses for deterministic CI; do not mock internal telemetry, authentication, persistence, or WebSocket delivery in the main E2E path. Keep an opt-in live-provider smoke test separate [T10].
 
@@ -781,15 +749,15 @@ Complete all milestones for the requested product. The ordering provides reviewa
 | Milestone | Work | Completion evidence |
 | --- | --- | --- |
 | M0 — Contracts and research | Finalize source adapters, units, API schema, temporal semantics, source manifest, and known modelling assumptions. | OpenAPI draft, sample packets, source documentation, and reproducible sample scenario specification. |
-| M0D — Frontend design foundation | Read the selected frontend-design skill and section 7; define tokens, screen composition, representative states, and a realistic fixture. | Design references, a rendered monitoring composition, selected-sensor/alert/mobile states, and an initial visual critique before broad UI implementation. |
+| M0D — Map-simulator design | Read section 7 and UI_DESIGN_RESEARCH.md; compare two compact canvas compositions with the same landscape fixture, then choose the working direction. | Recorded composition choice, object symbols/tokens, rendered placement/selected/running/mobile states, and initial composition/identity review. |
 | M1 — Application foundation | Workspace, Express/static React, Postgres/PostGIS, migrations, login, config, health checks. | Fresh local startup and protected mutation integration tests. |
-| M2 — Real sensor workflow | Sensor CRUD, location history, ingestion, credentials, durable outbox, live delivery, history. | A packet sent to the new API persists and updates the browser; unauthorized writes fail. |
-| M3 — Monitoring interface | Implement the section 7 design system and UX flows: map, list, all three charts, filters, status/incident UI, responsive composition, and interaction states. | Playwright monitoring/CRUD journeys, reviewed browser screenshots, keyboard/touch checks, and consistent map/chart/control styling. |
-| M4 — Environmental inputs | Weather/current/archive adapters, land cover, elevation, OSM enrichment, caches, optional overlays. | Source provenance visible; recorded fixtures and provider failure tests pass. |
-| M5 — Simulation | Surface-fire engine, synthetic sensors, multiple ignitions, deterministic clock, replay/checkpoints. | Seeded scenario reproduces gradual sensor response and is stable under seeking. |
+| M2 — Sensor objects and telemetry | Sensor profiles/capabilities, CRUD, location history, real ingestion, credentials, durable outbox, live delivery, history. | Different sensor profiles persist correctly; a real API packet updates the browser; unauthorized mutations fail. |
+| M3 — Map workspace | Implement full-map composition, object palette, direct placement, contextual inspection/charts, transport, and secondary filters/settings. Use labelled development fixtures until M4/M5 supply the engine. | Placement/CRUD and keyboard/touch journeys, reviewed canvas screenshots, no default dashboard layout, and a usable map while inspecting objects. |
+| M4 — Working physical landscape | Weather/current/archive, land cover, elevation, OSM enrichment, shared effective-grid contract, caches, terrain inspector, and optional overlays. | Terrain inspector matches engine input fixtures; provenance, missing coverage, and provider recovery are verified. |
+| M5 — Complete simulator journey | Surface-fire engine, capability-aware sensor response, multiple ignitions, deterministic clock, checkpoints, revision-safe editing, and connected map/WS/chart updates. | Place sensors on prepared terrain, ignite, run, inspect, and rewind without leaving the map. Controlled wind/fuel/slope/barrier fixtures alter results as documented; display-only changes do not. |
 | M6 — Inference | Detection features, candidate origins, ensemble correction, uncertainty, probability layers. | Blind synthetic tests demonstrate localization updates without ground-truth leakage. |
 | M7 — Satellite history and ML | FIRMS integration, coverage-aware dataset pipeline, small TensorFlow model, evaluation, export, scale-matched combination. | Real historical benchmark results, model card, trained artifact, and documented domain/fallback. |
-| M8 — End-to-end quality | Full E2E flows, failure cases, section 7 visual/usability review, accessibility checks, load and resource measurements. | Test report, reviewed visual baselines, UX_REVIEW.md, and measured performance; no unresolved blocking interaction defects. |
+| M8 — End-to-end quality | Full simulator and real-data E2E flows, failure cases, all section 7 gates, accessibility, load and resource measurements. | Test report, reviewed visual baselines, UX_REVIEW.md, terrain-effect evidence, and measured performance; no unresolved blocking interaction or identity defects. |
 | M9 — Ubuntu delivery | Install/start scripts, Compose, services, firewall handling, backup/restore, operational README. | Clean Ubuntu installation and deployment smoke tests; unresolved external prerequisites stated explicitly. |
 
 Expected package boundaries are `apps/web`, `apps/server`, `packages/contracts`, `packages/simulation`, `packages/inference`, and `packages/data-sources`, plus `db`, `scripts`, `deploy`, `tests`, and `docs`. Keep simulation and inference usable without a browser or HTTP server.
@@ -844,3 +812,5 @@ These references support data selection and modelling decisions. Engineering def
 - **[U6] W3C WAI.** [Understanding target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
 - **[U7] W3C WAI.** [Understanding focus not obscured](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html).
 - **[U8] Playwright.** [Visual comparisons and screenshot baselines](https://playwright.dev/docs/test-snapshots).
+- **[U9] Paul Bakaus, Impeccable.** [Upstream skill and mode definitions](https://github.com/pbakaus/impeccable/blob/main/plugin/skills/impeccable/SKILL.md). Secondary reference for task-oriented interface refinement. See UI_DESIGN_RESEARCH.md for tooling and workflow limitations.
+- **[U10] Vercel, web-design-guidelines.** [Upstream skill](https://github.com/vercel-labs/agent-skills/blob/main/skills/web-design-guidelines/SKILL.md) and its linked current interface guidelines. Use for implementation review, not as a visual identity generator.
