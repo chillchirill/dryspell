@@ -301,6 +301,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parts=urlsplit(self.path)
+        if parts.path=='/healthz':
+            ready=all((ROOT/p).exists() for p in ['output/firms/forecast_map.html',
+                       'output/history/history_latest.json','output/firms/climate_map.html'])
+            return self.json_response({'status':'ok' if ready else 'missing_snapshot'},200 if ready else 503)
         if parts.path in ['/','/forecast_map.html']:
             path=ROOT/'output/firms/forecast_map.html'; content_type='text/html; charset=utf-8'
         elif parts.path=='/climate_map.html':

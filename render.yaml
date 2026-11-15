@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: dryspell
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: TELEMETRY_UPSTREAM
+        value: ws://51.68.199.185:2500/ws

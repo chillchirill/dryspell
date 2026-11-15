@@ -172,6 +172,8 @@ $('iotAdd').onclick = () => {
 };
 sensorConnectionLabel('Not connected');
 setInterval(renderSensors, 5000);
+// The hosting gateway relays the team's feed over the site's own TLS connection.
+if(location.protocol==='https:')$('iotEndpoint').value='wss://'+location.host+'/ws/telemetry';
 try {
   const saved = JSON.parse(localStorage.getItem('wildfireTelemetry') || '{}');
   if (saved.url) {$('iotEndpoint').value = FireTelemetry.endpoint(saved.url, location.protocol);}

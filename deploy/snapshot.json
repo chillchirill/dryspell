@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "forecast_issued_at": "2026-11-13T17:00:00Z",
+  "files": {
+    "output/firms/forecast_map.html": {
+      "bytes": 11751181,
+      "sha256": "ba3ffd5e846dd65cd646062ae9bd28dbc36144cc86bca225562cc4479a3efc0f"
+    },
+    "output/firms/climate_map.html": {
+      "bytes": 10734358,
+      "sha256": "5944cd44aa8a6f2c6c3200c83da93d79e11cc96de847f477c9529106f188b13e"
+    },
+    "output/firms/forecast_web.json": {
+      "bytes": 2826007,
+      "sha256": "56441d3b1c43e096e32d71634e8ced45d1b50582861b0b48a9c932d45df83667"
+    },
+    "output/firms/forecast_latest.csv": {
+      "bytes": 7685643,
+      "sha256": "c9a4912f10d9716fd2606c45c859915fd68e96c4cc240d66efb5f874f3c32071"
+    },
+    "output/history/history_latest.json": {
+      "bytes": 1436816,
+      "sha256": "40d9033ad65dffa8adb070192bed815af5e9dd7257143589470c0620ab2088bc"
+    },
+    "output/history/history_monthly.csv": {
+      "bytes": 157377,
+      "sha256": "e1e44eec41757ddf7da300f05c64946ccf9cedd13e5f6ba8b3e5d48c86408503"
+    },
+    "output/history/viirs_points.csv.gz": {
+      "bytes": 3722868,
+      "sha256": "e19a876afb2a2d186593b2d64b4b1441e95558b3d23c47c9ac8dfabd6dab861b"
+    },
+    "output/spread/spread_active.geojson": {
+      "bytes": 6367522,
+      "sha256": "a8dc9e362a203db0307cb25af7839875ffbe13391c177d204d31fa201c5f7175"
+    },
+    "output/spread/spread_scenario.geojson": {
+      "bytes": 92842,
+      "sha256": "8f52dadfd357cec493f8147df95ee5742a884ecd8c30d50c2ce007ea3147c482"
+    },
+    "output/spread/spread_ireland.geojson": {
+      "bytes": 13774,
+      "sha256": "56dc0e25723dac17d981e3d20407dde23735d4cad3f4cf591437e766d9c989e2"
+    },
+    "output/spread/spread_europe.geojson": {
+      "bytes": 659959,
+      "sha256": "fb50b885b9ea44e65ef72d36a9e0d0c46e51996131c600871e00737a7a024bb3"
+    },
+    "data/gfs_uv/uv_cycle_20261113T12_003_033.npz": {
+      "bytes": 5152664,
+      "sha256": "d42843dac202a65b01de9efe804dbdd369dcec0d15cd2f1d57c0c919503593cd"
+    }
+  },
+  "archive_sha256": "03e6124e48b2f066a9ccea9b2f786c3fe2e488321935020fd6f67f2c40a25bdf"
+}
