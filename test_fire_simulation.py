@@ -49,5 +49,30 @@ class SimulationTests(unittest.TestCase):
         digest=hashlib.sha256(value.encode()).digest()
         self.assertEqual(result,[digest.hex(),int.from_bytes(digest[:4],'little')])
 
+    def test_seven_sites_use_distinct_prepared_terrain(self):
+        import gzip
+        sites=[s for s in simulation.sites() if s['id']!='glendalough']
+        self.assertEqual(len(sites),7);self.assertTrue(all(s['available'] for s in sites))
+        checksums=set()
+        for site in sites:
+            env=simulation.environment(site['id']);p=env['defaultIgnition'];b=env['bounds']
+            self.assertTrue(b['west']<=p['longitude']<b['east'] and b['south']<=p['latitude']<b['north'])
+            self.assertEqual(len(env['cover']),40000)
+            raw=json.loads(gzip.decompress(simulation.site_path(site['id']).read_bytes()))
+            checksums.add(raw['landscape']['checksum'])
+            self.assertTrue(all(not source['sample'] for source in raw['landscape']['provenance']))
+        self.assertEqual(len(checksums),7)
+
+    def test_cached_forecast_wind_is_used_at_the_same_time_origin(self):
+        request=self.request();request['weatherMode']='forecast_wind'
+        result=simulation.run(request)
+        self.assertEqual(result['weatherMode'],'forecast_wind')
+        self.assertEqual(result['startTime'],result['forecastWind']['issuedAt'])
+        first,last=result['frames'][0]['weather'],result['frames'][-1]['weather']
+        self.assertEqual(first['windSpeedMps'],result['forecastWind']['samples'][0]['windSpeedMps'])
+        self.assertAlmostEqual(last['windFromDeg'],result['forecastWind']['samples'][-1]['windFromDeg'],places=10)
+        self.assertNotEqual(first['windFromDeg'],last['windFromDeg'])
+        self.assertAlmostEqual((first['windFromDeg']+180)%360,result['forecastWind']['samples'][0]['windToDeg'])
+
 
 if __name__=='__main__':unittest.main()

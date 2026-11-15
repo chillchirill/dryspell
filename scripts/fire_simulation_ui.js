@@ -27,18 +27,22 @@
   `;
   document.head.append(style);
   const panel=document.createElement('aside');panel.className='panel';panel.id='simulation-panel';panel.hidden=true;
-  panel.innerHTML=`<div class="head"><div><div class="sim-tag">What-if scenario · Ireland</div><h1>Glendalough fire simulation</h1><div class="sub">Prepared 5 × 5 km area · 25 m cells</div></div><button class="collapse" id="sim-close" aria-label="Return to forecast">×</button></div>
+  panel.innerHTML=`<div class="head"><div><div class="sim-tag">What-if scenario · Ireland</div><h1>Ireland fire simulation</h1><div class="sub">7 forecast areas + Glendalough · 25 m cells</div></div><button class="collapse" id="sim-close" aria-label="Return to forecast">×</button></div>
     <div class="body"><section>
-      <div class="hint">Real terrain and land cover. Synthetic dry summer weather. This is an illustrative scenario, not a current fire or a validated forecast.</div>
+      <label for="sim-site">Prepared area (5 × 5 km)</label><select id="sim-site" style="width:100%"></select>
+      <div class="hint" id="sim-site-probability"></div>
+      <div class="hint">Real terrain and land cover. Choose cached forecast wind or manual wind. Temperature, humidity and rain remain a dry-weather what-if. Not an observed fire or a validated forecast.</div>
       <div class="sim-actions"><button class="btn" id="sim-demo">Demo setup</button><button class="btn" id="sim-focus">Find area</button><button class="btn" id="sim-clear">Clear objects</button></div>
       <div class="sim-actions"><button class="btn" id="sim-ignite" aria-pressed="false">Place ignition</button><button class="btn" id="sim-sensor" aria-pressed="false">Place virtual sensor</button></div>
       <div class="field"><label for="sim-profile">Sensor profile</label><select id="sim-profile"><option value="temperature">Temperature only</option><option value="combined">Temperature, RH &amp; smoke</option></select></div>
       <div class="hint">Click inside the outlined area. Up to 8 virtual sensors. The fire cannot start on water or unknown terrain.</div>
     </section><section>
       <h2>Scenario weather</h2><div class="hint">27 °C · 35% RH · no rain. Constant conditions for this run; not live weather.</div>
-      <label for="sim-wind">Wind speed: <output id="sim-wind-value">4</output> m/s</label><input type="range" id="sim-wind" min="0" max="15" step="1" value="4">
+      <div class="field"><label for="sim-weather-mode">Wind source</label><select id="sim-weather-mode"><option value="forecast_wind">Map forecast (cached GFS)</option><option value="manual">Manual scenario</option></select></div>
+      <div class="hint" id="sim-wind-source">Cached forecast wind is loaded at the ignition location.</div>
+      <div id="sim-manual-wind" hidden><label for="sim-wind">Wind speed: <output id="sim-wind-value">4</output> m/s</label><input type="range" id="sim-wind" min="0" max="15" step="1" value="4">
       <div class="field"><label for="sim-from">Wind from</label><select id="sim-from"><option value="270">West → east</option><option value="225">Southwest → northeast</option><option value="180">South → north</option><option value="90">East → west</option><option value="0">North → south</option></select></div>
-      <div class="field"><label for="sim-duration">Duration</label><select id="sim-duration"><option value="1800">30 minutes</option><option value="3600" selected>1 hour</option><option value="10800">3 hours</option></select></div>
+      </div><div class="field"><label for="sim-duration">Duration</label><select id="sim-duration"><option value="1800">30 minutes</option><option value="3600" selected>1 hour</option><option value="10800">3 hours</option></select></div>
       <button class="btn primary" id="sim-run">Calculate &amp; play</button>
       <div id="sim-status" role="status">Loading prepared terrain…</div>
       <div id="sim-stat"></div>
@@ -52,10 +56,38 @@
   let active=false,environment=null,view=null,layer=null,terrain=null,fire=null,markerLayer=null;
   let ignition=null,sensors=[],result=null,playing=false,cursor=0,lastFrame=-1,lastTick=0,pick=null,busy=false,generation=0,abort=null;
   let savedSensorVisibility=false;
+  let siteId='glendalough',catalog=[],catalogPromise=null,siteLoadVersion=0;
+  async function getCatalog() {
+    if(!catalogPromise)catalogPromise=fetch('/api/simulation/sites').then(async response=>{
+      if(!response.ok)throw new Error('Prepared area list is unavailable. Restart the updated dashboard server.');
+      catalog=await response.json();el('sim-site').replaceChildren();
+      for(const site of catalog){const option=document.createElement('option');option.value=site.id;option.textContent=site.label+(site.available?'':' · data unavailable');option.disabled=!site.available;el('sim-site').append(option);}
+      el('sim-site').value=siteId;return catalog;
+    }).catch(error=>{catalogPromise=null;throw error;});
+    return catalogPromise;
+  }
   const simPane=map.createPane('simulation');simPane.style.zIndex=450;simPane.style.pointerEvents='none';
   const simMarkers=map.createPane('simulationObjects');simMarkers.style.zIndex=630;
   const palette={grass:[154,171,104],woodland:[53,107,68],scrub:[117,139,92],water:[63,141,186],built:[148,148,148],unknown:[83,87,92]};
   const message=text=>{el('sim-status').textContent=text;};
+  let windPreviewVersion=0;
+  async function windPreview() {
+    const manual=el('sim-weather-mode').value==='manual';
+    el('sim-manual-wind').hidden=!manual;
+    el('sim-wind').disabled=!manual;el('sim-from').disabled=!manual;
+    const version=++windPreviewVersion;
+    if(manual){el('sim-wind-source').textContent='Manually selected wind. Not an observed weather event.';return;}
+    if(!ignition){el('sim-wind-source').textContent='Place an ignition to load cached forecast wind.';return;}
+    el('sim-wind-source').textContent='Loading wind from the map forecast…';
+    try {
+      const query=new URLSearchParams({lat:ignition.latitude,lon:ignition.longitude,duration:el('sim-duration').value});
+      const response=await fetch('/api/simulation/wind?'+query);const data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Cached wind unavailable');
+      if(version!==windPreviewVersion)return;
+      const a=data.samples[0],b=data.samples.at(-1);
+      el('sim-wind-source').textContent=`Map forecast: ${data.issuedAt.replace('T',' ')} · GFS cycle ${data.cycleUTC.replace('T',' ')}. Wind ${a.windSpeedMps.toFixed(1)} → ${b.windSpeedMps.toFixed(1)} m/s; TO ${a.windToDeg===null?'calm':a.windToDeg.toFixed(0)+'°'} → ${b.windToDeg===null?'calm':b.windToDeg.toFixed(0)+'°'}. Varies through the run; cached, not live.`;
+    } catch(error){if(version===windPreviewVersion)el('sim-wind-source').textContent=error.message+' — no synthetic wind substitution.';}
+  }
   const coordinate=ll=>({longitude:ll.lng,latitude:ll.lat});
   const bounds=()=>[[environment.bounds.south,environment.bounds.west],[environment.bounds.north,environment.bounds.east]];
   function index(point) {
@@ -118,9 +150,9 @@
     // Positions are inside the prepared grid; they are explicitly simulated devices.
     const b=environment.bounds,dx=(b.east-b.west)/environment.width,dy=(b.north-b.south)/environment.height;
     sensors=[{...ignition,profileId:'temperature'},
-      {longitude:ignition.longitude+dx*8,latitude:ignition.latitude,profileId:'temperature'},
-      {longitude:ignition.longitude+dx*18,latitude:ignition.latitude+dy*4,profileId:'combined'}];
-    pickingMode(null);renderObjects();message('Demo ready: one ignition and three virtual sensors. Calculate to begin.');
+      {longitude:Math.min(b.east-dx/2,ignition.longitude+dx*8),latitude:ignition.latitude,profileId:'temperature'},
+      {longitude:Math.min(b.east-dx/2,ignition.longitude+dx*18),latitude:Math.min(b.north-dy/2,ignition.latitude+dy*4),profileId:'combined'}];
+    pickingMode(null);renderObjects();windPreview();message('Demo ready: one ignition and three virtual sensors. Calculate to begin.');
   }
   function draw(time) {
     if(!result)return;
@@ -141,39 +173,53 @@
     lastTick=now;requestAnimationFrame(tick);
   }
   async function calculate() {
+    if(!environment){message('Choose an available prepared area first.');return;}
     if(!ignition){message('Place an ignition on burnable terrain first.');return;}
     invalidate();pickingMode(null);busy=true;const token=generation,controller=new AbortController();abort=controller;
     el('sim-run').disabled=true;message('Calculating spread and virtual sensor responses…');
     try {
       const response=await fetch('/api/simulation/run',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,
-        body:JSON.stringify({ignition,sensors,durationSec:Number(el('sim-duration').value),windSpeedMps:Number(el('sim-wind').value),windFromDeg:Number(el('sim-from').value)})});
+        body:JSON.stringify({siteId,ignition,sensors,durationSec:Number(el('sim-duration').value),windSpeedMps:Number(el('sim-wind').value),windFromDeg:Number(el('sim-from').value),weatherMode:el('sim-weather-mode').value})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Simulation unavailable');
       if(token!==generation||!active)return;
       result=data;ignition=data.ignition;sensors=data.sensors.map(s=>({...s.location,profileId:s.profileId}));
       el('sim-time-slider').max=data.durationSec;el('sim-time-slider').disabled=false;el('sim-play').disabled=false;
-      lastFrame=-1;draw(0);message('Calculated scenario · dry summer conditions · virtual readings.');play();
+      lastFrame=-1;draw(0);message(data.weatherMode==='forecast_wind'?'Calculated with cached GFS wind from the map forecast; dry-weather what-if.':'Calculated with manual wind; dry-weather what-if.');play();
     }catch(error){if(error.name!=='AbortError'&&token===generation)message(error.message);}
     finally{if(token===generation){busy=false;el('sim-run').disabled=false;}}
   }
-  async function open() {
-    if(active)return;
+  async function loadSite(id) {
+    const version=++siteLoadVersion;invalidate();++windPreviewVersion;pickingMode(null);
+    if(layer)map.removeLayer(layer);layer=null;markerLayer=null;environment=null;ignition=null;sensors=[];
+    el('sim-run').disabled=true;message('Loading the local terrain and vegetation…');
+    try{
+      await getCatalog();const site=catalog.find(s=>s.id===id&&s.available);
+      if(!site)throw new Error('This area is not prepared. No substitute terrain will be used.');
+      const response=await fetch('/api/simulation/environment?site='+encodeURIComponent(id));
+      if(!response.ok)throw new Error('Prepared terrain unavailable');const data=await response.json();
+      if(version!==siteLoadVersion||!active)return;
+      siteId=id;environment=data;el('sim-site').value=id;
+      el('sim-site-probability').textContent=site.probability===undefined?'Glendalough: standalone demonstration area.':
+        `Forecast cell probability ${(site.probability*100).toFixed(2)}% · ${site.forecastIssuedAt.replace('T',' ')}. This is a conditional local scenario, not a confirmed ignition.`;
+      layer=L.layerGroup();markerLayer=L.layerGroup().addTo(layer);
+      terrain=L.imageOverlay(image(i=>[...palette[environment.cover[i]],170]),bounds(),{pane:'simulation',interactive:false}).addTo(layer);
+      L.rectangle(bounds(),{pane:'simulation',color:'#ffd27f',weight:2,fill:false,interactive:false}).addTo(layer);
+      el('sim-sources').textContent=environment.provenance.map(p=>p.attribution+' · '+p.version).join(' | ');
+      demo();layer.addTo(map);focus();el('sim-run').disabled=false;
+    }catch(error){if(version===siteLoadVersion)message(error.message);}
+  }
+  async function open(id=siteId) {
+    if(active){if(id!==siteId)await loadSite(id);return;}
     if(window.FireHistory?.isActive())window.FireHistory.close();
     view={center:map.getCenter(),zoom:map.getZoom()};active=true;panel.hidden=false;clock.hidden=false;
     document.body.classList.add('simulation-view');setPlaying(false,true);setPicking(false);map.closePopup();map.removeLayer(hl);
     pane.style.visibility='hidden';el('timebar').style.visibility='hidden';savedSensorVisibility=map.hasLayer(sensorGroup);map.removeLayer(sensorGroup);
     window.FireSpreadLayer?.refresh();
-    try {
-      if(!environment){const response=await fetch('/api/simulation/environment');if(!response.ok)throw new Error('Open this map through the updated local dashboard server to run the simulation.');environment=await response.json();}
-      if(!active)return;
-      if(!layer){layer=L.layerGroup();markerLayer=L.layerGroup().addTo(layer);
-        terrain=L.imageOverlay(image(i=>[...palette[environment.cover[i]],170]),bounds(),{pane:'simulation',interactive:false}).addTo(layer);
-        L.rectangle(bounds(),{pane:'simulation',color:'#ffd27f',weight:2,fill:false,interactive:false}).addTo(layer);
-        el('sim-sources').textContent=environment.provenance.map(p=>p.attribution+' · '+p.version).join(' | ');demo();}
-      layer.addTo(map);focus();
-    }catch(error){message(error.message);}
+    if(environment&&layer&&id===siteId){layer.addTo(map);focus();windPreview();}
+    else await loadSite(id);
   }
   function close() {
-    if(!active)return;stop();generation++;abort?.abort();busy=false;el('sim-run').disabled=false;active=false;pickingMode(null);
+    if(!active)return;stop();generation++;siteLoadVersion++;windPreviewVersion++;abort?.abort();busy=false;el('sim-run').disabled=false;active=false;pickingMode(null);
     panel.hidden=true;clock.hidden=true;document.body.classList.remove('simulation-view');if(layer)map.removeLayer(layer);map.closePopup();
     if(savedSensorVisibility)sensorGroup.addTo(map);pane.style.visibility='';el('timebar').style.visibility='';applyOverlays();
     if(view)map.setView(view.center,view.zoom,{animate:false});window.FireSpreadLayer?.refresh();
@@ -181,10 +227,10 @@
   map.on('click',event=>{
     if(!active||!environment)return;
     const point=coordinate(event.latlng),i=index(point);
-    if(i<0){message('Choose a point inside the outlined Glendalough area.');return;}
+    if(i<0){message('Choose a point inside the outlined prepared area.');return;}
     if(pick==='ignition'){
       if(!environment.burnable[i]){message('This cell is water, built or unknown terrain. Choose a burnable cell.');return;}
-      invalidate();ignition=point;pickingMode(null);renderObjects();message('Ignition placed. Calculate to run the scenario.');
+      invalidate();ignition=point;pickingMode(null);renderObjects();windPreview();message('Ignition placed. Calculate to run the scenario.');
     }else if(pick==='sensor'){
       if(sensors.length>=8){message('Maximum 8 virtual sensors. Remove one to add another.');return;}
       invalidate();sensors.push({...point,profileId:el('sim-profile').value});pickingMode(null);renderObjects();message('Virtual sensor placed. Recalculate to see its response.');
@@ -193,16 +239,28 @@
       message(`${environment.cover[i]} · elevation ${elevation===null?'unknown':elevation.toFixed(0)+' m'} · ${environment.burnable[i]?'burnable':'not burnable'} in this scenario`);
     }
   });
-  el('simulation-open').onclick=open;el('sim-close').onclick=close;el('sim-focus').onclick=focus;el('sim-demo').onclick=demo;
+  el('simulation-open').onclick=()=>open();el('sim-site').onchange=()=>loadSite(el('sim-site').value);
+  el('sim-close').onclick=close;el('sim-focus').onclick=focus;el('sim-demo').onclick=demo;
   el('sim-ignite').onclick=()=>{pickingMode(pick==='ignition'?null:'ignition');message('Click burnable terrain inside the outlined area.');};
   el('sim-sensor').onclick=()=>{pickingMode(pick==='sensor'?null:'sensor');message('Click inside the area to place a virtual sensor.');};
   el('sim-clear').onclick=()=>{invalidate();ignition=null;sensors=[];pickingMode(null);renderObjects();message('Place an ignition and virtual sensors, or choose Demo setup.');};
   el('sim-run').onclick=calculate;el('sim-play').onclick=()=>playing?stop():play();
   el('sim-time-slider').oninput=e=>{stop();draw(Number(e.target.value));};
   for(const id of ['sim-wind','sim-from','sim-duration'])el(id).oninput=()=>{el('sim-wind-value').textContent=el('sim-wind').value;invalidate();message('Scenario inputs changed. Calculate again.');};
-  window.FireSimulation={open,close,isActive:()=>active,getState:()=>({active,ready:!!environment,busy,playing,
+  el('sim-weather-mode').onchange=()=>{invalidate();windPreview();message('Wind source changed. Calculate again.');};
+  el('sim-duration').oninput=()=>{invalidate();windPreview();message('Duration changed. Calculate again.');};
+  window.FireSimulation={open,close,openSite:id=>{
+    if(el('sim-weather-mode').value!=='forecast_wind') {
+      el('sim-weather-mode').value='forecast_wind';invalidate();windPreview();
+    }
+    return open(id);
+  },
+    buttonFor:(lat,lon,day=0)=>{const site=catalog.find(s=>s.available&&s.latitude===lat&&s.longitude===lon);return site&&day===0?`<button class="btn" style="margin-top:8px" onclick="window.FireSimulation.openSite('${site.id}')">Simulate this area</button>`:'';},
+    isActive:()=>active,getState:()=>({active,ready:!!environment,busy,playing,siteId,sites:catalog,
     duration:result?.durationSec||0,timeSec:lastFrame<0?0:lastFrame*30,frames:result?.frames.length||0,
     ignition,sensors:sensors.map(s=>({...s})),frame:result?.frames[Math.max(0,lastFrame)]||null,
+    weatherMode:result?.weatherMode||el('sim-weather-mode').value,forecastWind:result?.forecastWind||null,
     bounds:environment?.bounds,defaultIgnition:environment?.defaultIgnition})};
   requestAnimationFrame(tick);
+  getCatalog().catch(()=>{});
 })();

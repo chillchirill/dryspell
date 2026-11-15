@@ -45,3 +45,18 @@ test('browser endpoint policy rejects mixed content and embedded secrets', () =>
   }
   assert.throws(()=>T.endpoint('ws://example.org/ws','https:'));
 });
+test('new platform snapshots map sensor IDs to real device IDs',()=>{
+  const decode=T.createDecoder();
+  const reading={sensorId:'registry-1',source:'real',recordedAt:sample.recordedAt,values:{temperatureC:0},quality:[]};
+  const result=decode({type:'snapshot',context:'live',payload:{sensors:[{id:'registry-1',deviceId:'esp32-01',source:'real'}],readings:[reading]}},now);
+  assert.equal(result[0].deviceId,'esp32-01');assert.equal(result[0].temperatureC,0);
+  assert.equal(decode({type:'sensor.reading',context:'live',payload:{...reading,values:{temperatureC:25}}},now)[0].temperatureC,25);
+  assert.deepEqual(decode({type:'sensor.reading',context:'simulation',payload:reading},now),[]);
+  assert.deepEqual(decode({type:'sensor.reading',context:'live',payload:{...reading,source:'simulated'}},now),[]);
+  assert.throws(()=>decode({type:'sensor.reading',context:'live',payload:{...reading,quality:['fault']}},now));
+});
+test('new platform requires registry and legacy receiver still works',()=>{
+  const decode=T.createDecoder();
+  assert.throws(()=>decode({type:'sensor.reading',context:'live',payload:{sensorId:'unknown',source:'real',recordedAt:sample.recordedAt,values:{temperatureC:25}}},now));
+  assert.equal(decode({event:'request',time:sample.recordedAt,body:sample},now)[0].deviceId,'esp32-01');
+});

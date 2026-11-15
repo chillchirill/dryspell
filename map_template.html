@@ -301,6 +301,8 @@ body:not(.dark) .spread-key { color:#6d28d9; }
         <div><button class="btn primary" id="iotConnect">Connect</button> <button class="btn" id="iotDisconnect" disabled>Disconnect</button></div>
       </div>
       <div id="iotConnection" role="status">Not connected</div>
+      <div id="iotTransport" class="hint">No messages received.</div>
+      <button class="btn" id="iotDetected" hidden>Use detected device ID</button>
       <div id="iotMessage" class="hint" role="status"></div>
       <div class="hint">Live temperature observations. Forecast probabilities stay separate. Readings become stale after 2 minutes. Controller locations are saved in this browser.</div>
     </section>
@@ -595,7 +597,8 @@ function popupHtml(i, k) {
       <tr><td>Days since rain</td><td>${D.dsr[i]}</td></tr>
       <tr><td>Fires seen, last 24 h</td><td>${D.det[i]}</td></tr>
     </table>
-    ${FR[i] ? '<div class="pop-new">New fire area: nothing burned within about 100 km in the last 7 days.</div>' : ''}`;
+    ${FR[i] ? '<div class="pop-new">New fire area: nothing burned within about 100 km in the last 7 days.</div>' : ''}
+    ${window.FireSimulation?.buttonFor(D.lat[i],D.lon[i],k)||''}`;
 }
 map.on('mousemove', e => {
   const i = (typeof picking === 'function' && picking()) ? -1 : cellAt(e.latlng);
@@ -794,7 +797,8 @@ requestAnimationFrame(now => { last = now; frame(now); applyOverlays(); });   //
       <tr><td>Estimated spread toward</td><td>${compass(frame.spread_bearing_deg)}</td></tr>
       <tr><td>Head-fire travel</td><td>${frame.cumulative_head_distance_km.toFixed(2)} km</td></tr>
       <tr><td>Satellite detections</td><td>${fmt(p.n_points)}</td></tr></table>
-      <div class="hint">Cached weather forecast, not live station readings. ${p.source==='scenario'?'Conditional on a fire occurring. ':''}${model}. Travel is a heuristic estimate, not a burned perimeter.</div>`;
+      <div class="hint">Cached weather forecast, not live station readings. ${p.source==='scenario'?'Conditional on a fire occurring. ':''}${model}. Travel is a heuristic estimate, not a burned perimeter.</div>
+      ${window.FireSimulation?.buttonFor(feature.geometry.coordinates[1],feature.geometry.coordinates[0])||''}`;
   }
   function selectFeature(id,focus=false) {
     selected=dataset()?.features.find(f=>f.id===id)||null;

@@ -248,6 +248,9 @@ Send a fresh timestamp for each measurement. `recordedAt` is optional if the
 controller has no clock: the receiver's `time` is then displayed as server
 receipt time, not measurement time. The adapter accepts either the direct JSON
 object or the existing receiver's `{event:"request",time,query,body}` envelope.
+The newer webplatform live `snapshot`, `sensor.updated` and `sensor.reading`
+messages are also supported. Its registry maps internal sensorId to deviceId;
+simulation/history contexts, simulated sensors and faulted temperatures are excluded.
 JSON bodies, form numeric strings and GET query fields are supported. Aliases:
 `device_id`, `tempC`, `temperature`, `temp`, and `recorded_at`. All temperature
 aliases mean Celsius; a supplied `unit` must be C, ?C or celsius. Device IDs must
@@ -270,7 +273,7 @@ The current receiver is a prototype broadcast feed, not authenticated device
 registration. Keep ingest secrets out of the browser and WebSocket URL. Do not
 reuse the old historical forecast timestamp as the live measurement timestamp.
 
-Validation uses five Node contract tests and the existing desktop/mobile browser
+Validation uses seven Node contract tests and the existing desktop/mobile browser
 suite. Its loopback-only relay sends explicitly synthetic QA readings through
 HTTP -> WebSocket -> the map and checks routing, invalid/old readings,
 staleness, reconnection, and unchanged forecast probabilities. It never POSTs
@@ -283,89 +286,98 @@ test data to the team's remote server. Run Node through the project Python:
 
 ## Ireland simulation on the forecast map
 
-Open **Ireland fire simulation** on the existing local dashboard. This is a
-bounded 5 ? 5 km Glendalough scenario, not coverage of all Ireland. Demo setup
-places one ignition and three explicitly virtual sensors. Calculate & play
-computes 30-minute, one-hour or three-hour runs; pause and seek replay the same
-calculated frames. Users can replace the ignition, place up to eight virtual
-temperature/combined sensors, inspect terrain by clicking, and change scenario
-wind. Water/unknown/built ignition and points outside the prepared grid are
-rejected. Closing the mode restores forecast layers, view and real controllers.
-Virtual readings never enter the live telemetry registry or the forecast model.
+Open **Ireland fire simulation** on the existing local dashboard, choose a
+prepared area and click **Calculate & play**. All seven displayed forecast cells
+on the island of Ireland have separate 5 x 5 km terrain grids, plus the original
+Glendalough demonstration area. A forecast cell or direction-arrow popup offers
+**Simulate this area** where a grid is available. This is seven local windows,
+not continuous coverage of the whole island. Probabilities are the original
+13 November 2026 17:00 UTC snapshot; these are not seven confirmed fires.
+
+The default wind source is the **cached NOAA GFS forecast** used by the map.
+U/V is bilinearly sampled at the ignition and interpolated through the run.
+The UI shows the issue date, GFS cycle, speed and direction. Wind TO is converted
+to meteorological FROM for the engine. It is forecast wind, not live station
+wind. Missing wind cache is an error; there is no automatic download or silent
+manual fallback. Manual speed/direction remain available for what-if scenarios.
+Temperature (27 C), RH (35%) and rain (0) are synthetic dry-weather assumptions.
+Neither weather mode is a calibrated prediction of a real burned perimeter.
+
+Demo setup places an ignition on nearby burnable terrain and three explicitly
+virtual sensors. Users can replace the ignition and place up to eight virtual
+sensors, including temperature-only profiles. Water, built/unknown terrain and
+out-of-area ignition are rejected. Calculate runs 30 minutes, one hour or three
+hours; pause and seek replay the same frames. Engine time steps are 5 seconds,
+returned frames 30 seconds; playback speed does not alter the solver.
+Closing the mode restores forecast layers and real controllers. Virtual readings
+never enter live telemetry or change ML probabilities or the historical calendar.
 
 The pinned team engine `surface-grid-1.2.0` comes from `webiot` commit `63061bc`.
-Original TypeScript and generated runtime modules are in
-`vendor/irish_simulation/`; `provenance.json` records full commit/source hashes.
-The only numerical support adaptation is equivalent Node-native SHA-256
-instead of the original browser hash dependency. No React, PostgreSQL, new npm
-packages or map service on port 4177 is required. Node 24 must be available.
-All commands continue to be launched through `.venv\Scripts\python.exe`.
+Source, generated modules and hashes are in `vendor/irish_simulation/`.
+The numerical support adaptation is Node-native SHA-256 instead of the browser
+hash dependency. Node 24 is required; React, PostgreSQL and new npm packages are
+not required. Run commands through `.venv\Scripts\python.exe`.
 
-The cached terrain is the team's actual WorldCover 2021 / Copernicus DSM
-prepared 40,000-cell grid (25 m). The original metadata and attribution are
-retained in compressed `environment.json.gz` (about 0.67 MB). No terrain or
-weather acquisition occurs. Fuel rates and virtual sensor responses remain
-illustrative assumptions. The scenario explicitly holds 27 ?C, 35% RH, no rain
-and user-selected wind constant. These are synthetic dry-summer conditions,
-not current weather, a climate projection, observed fire or a calibrated forecast.
-Weather wind direction is meteorological FROM; the UI labels the corresponding
-TO direction. The engine retains 5-second numerical steps, while returned/display
-frames are sampled every 30 seconds. Playback speed does not change the solver.
+### Terrain acquisition and provenance
 
-GET `/api/simulation/environment` returns the prepared extent, terrain classes,
-elevation, placement mask and provenance. POST `/api/simulation/run` accepts
-`ignition:{longitude,latitude}`, `sensors:[{longitude,latitude,profileId}]`,
-`durationSec` (1800/3600/10800), `windSpeedMps` (0?15), `windFromDeg` (0?<360).
-The local server allows one calculation at a time, caps request size and has a
-90-second child-process timeout. Runs are returned to the browser, not saved
-as scientific observations or probabilities. Simulation needs the local server;
-a standalone HTML file cannot execute the numerical engine.
+Each of the seven new grids uses its own ESA WorldCover 2021 land cover and
+Copernicus DEM GLO-30 elevation, sampled to a 200 x 200 grid at approximately
+25 m. Fuel rates and sensor responses remain illustrative. Original Glendalough
+terrain is preserved separately. Attribution, source URLs, raster alignment and
+checksums accompany the compressed grids in `vendor/irish_simulation/sites/`.
+`planned_sites.csv` records the seven snapshot locations and availability.
 
-Rebuild with `fire_dashboard.py build` and restart `fire_dashboard.py serve`
-after installing these routes. `scripts/prepare_irish_simulation.py` reproduces
-the vendored source/data from the already-fetched Git commit, using Node's
-built-in TypeScript transformation without downloads. It is not necessary for
-a normal run when the checked-in runtime modules/data are present.
+The approved acquisition fetched **20.884 MB** of pixel blocks, with a hard
+25 MB limit, after a separate 0.524 MB metadata preflight. The final seven gzip
+grids total approximately 6.757 MB. A subsequent alignment correction rebuilt
+from cached blocks with zero additional download. No whole source tiles were
+fetched. `acquisition.json` records planned bytes and the most recent build's
+network bytes (zero for this cached rebuild).
 
-`test_fire_simulation.py` checks real engine determinism, wind sensitivity,
-virtual profile capabilities, input bounds and SHA-256 equivalence. The browser
-suite also exercises placement, water rejection, calculation, pause/rewind,
-mobile layout and restoration of the original forecast. Those are software
-checks, not scientific validation of spread accuracy.
+Ordinary dashboard use is entirely offline for scientific inputs. Optional
+`scripts/prepare_ireland_sites.py` reproduces the grids; its `--plan` performs
+metadata requests, and `--download-approved` performs the bounded acquisition.
+Do not use either as part of normal startup. Optional preparation dependencies
+are in `requirements-terrain.txt`; they are not needed to run checked-in grids.
+Cached blocks and acquisition plan stay in ignored `output/simulation/`.
 
-## Team handoff: seven island-of-Ireland forecast sites
+### API and verification
 
-The agreed next scope is all seven displayed island-of-Ireland forecast cells:
-four in the Republic and three in Northern Ireland. Their coordinates, original
-probabilities, snapshot times and cached wind coverage are recorded in
-`vendor/irish_simulation/planned_sites.csv` (forecast issued 13 November 2026,
-17:00 UTC). These are forecast cells, not seven confirmed fires or an exhaustive
-list of places where Irish fires occur.
+- GET `/api/simulation/sites`: prepared areas and dated snapshot probabilities.
+- GET `/api/simulation/environment?site=ireland-0`: compact selected terrain,
+  placement mask, default ignition and provenance; default is Glendalough.
+- GET `/api/simulation/wind?lat=53.375&lon=-7.125&duration=3600`: cached wind.
+- POST `/api/simulation/run`: `siteId`, `weatherMode` (`forecast_wind` or `manual`),
+  `ignition:{longitude,latitude}`, `sensors:[{longitude,latitude,profileId}]`,
+  `durationSec` (1800/3600/10800), `windSpeedMps` (0..15), `windFromDeg` (0..<360).
+  Omitted site/mode retains the original Glendalough/manual API behavior.
 
-**Delivered:** the Glendalough simulation, the two-year calendar, and the
-WebSocket temperature panel on the existing forecast map. **Not implemented:**
-simulation at the seven forecast sites and automatic transfer of their forecast
-weather into the simulation. Those seven sites lack prepared local land-cover
-and detailed elevation windows; never relocate Glendalough terrain to them.
-The plan is one 5 km window per site. No new scientific data were downloaded for
-that extension, and no full-island simulation is claimed.
-
-The live panel currently speaks the original receiver protocol on port 2500.
-The new webplatform typed snapshot/sensor.reading protocol needs a separate
-adapter, including sensorId-to-deviceId mapping and source/context checks.
-The remote socket connection was verified, but the real controller was switched
-off; receipt of its first actual measurement remains a hardware integration check.
-
-Run the existing map with the already supplied forecast/history caches:
+The server allows one calculation at a time, caps request size and terminates
+workers after 90 seconds. Scenario results are not stored as observations.
+Standalone HTML cannot execute the engine; use the local server:
 
 ```powershell
 .venv\Scripts\python.exe fire_dashboard.py build
 .venv\Scripts\python.exe fire_dashboard.py serve --port 8000
 ```
 
+Python checks cover determinism, wind response, GFS vector sampling, seven
+distinct terrain grids, input bounds and virtual sensor profiles. Browser checks
+cover all seven area selectors, calculations, wind changes, water rejection,
+rewind, mobile layout and restoring the forecast. These are software checks,
+not scientific validation of spread accuracy.
+
+### Controller handoff
+
+The panel supports both receiver formats described above, displays connection
+and message diagnostics, and can prefill a detected device ID for map placement.
+On reconnect, older samples remain labelled as waiting for a new update.
+A WebSocket connection alone does not establish that hardware is transmitting.
+The team's controller was switched off during verification; receipt of a real
+measurement still needs checking when it is enabled. Local synthetic QA messages
+passed through HTTP -> WebSocket -> map without changing forecast probabilities.
+
 Forecast/model caches, generated `output/`, the two-year handoff ZIP and `.venv/`
-are not included in Git. A fresh checkout needs those existing inputs and the
-Python dependencies described above; do not interpret a missing snapshot as zero
-risk. The small Glendalough terrain bundle and its engine ARE included. Node 24
-must be available for the simulation. Do not download missing scientific data
-without the separately agreed scope and approval.
+are excluded from Git. A fresh checkout needs those existing inputs. The small
+terrain bundles and simulation runtime are included in source control scope.
+Do not download missing scientific inputs outside the separately approved scope.

@@ -244,9 +244,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif parts.path=='/api/simulation/environment':
             from fire_simulation import environment
             try:
-                return self.json_response(environment())
+                return self.json_response(environment(parse_qs(parts.query).get('site',['glendalough'])[0]))
+            except ValueError as error:
+                return self.json_response({'error':str(error)},400)
             except FileNotFoundError:
                 return self.json_response({'error':'Prepared Ireland simulation is unavailable'},503)
+        elif parts.path=='/api/simulation/sites':
+            from fire_simulation import sites
+            return self.json_response(sites())
+        elif parts.path=='/api/simulation/wind':
+            from fire_simulation import forecast_wind
+            query=parse_qs(parts.query)
+            try:
+                return self.json_response(forecast_wind(float(query.get('lat',[''])[0]),
+                    float(query.get('lon',[''])[0]),int(query.get('duration',['3600'])[0])))
+            except ValueError as error:
+                return self.json_response({'error':str(error)},400)
+            except FileNotFoundError:
+                return self.json_response({'error':'Matching cached GFS wind is unavailable; no data downloaded'},503)
         elif parts.path=='/api/history':
             path=ROOT/'output/history/history_latest.json'; content_type='application/json'
         elif parts.path=='/api/history/detections':
