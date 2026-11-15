@@ -123,7 +123,7 @@ body.noscroll-dummy {}
 
 <aside class="panel" id="panel">
   <div class="head">
-    <div><h1>Wildfire seasons</h1><div class="sub"><a href="forecast_map.html">&larr; Next 4 days</a></div></div>
+    <div><h1>Wildfire seasons</h1><div class="sub">VIIRS seasonal overview | 2 years<br><a href="forecast_map.html">MODIS + VIIRS calendar</a> | <a href="forecast_map.html?view=forecast">Forecast</a></div></div>
     <button class="collapse" id="collapse" aria-label="Hide or show the panel">&minus;</button>
   </div>
   <div class="body">
@@ -373,7 +373,7 @@ function stats(full) {
   let n = 0;
   for (let i = 0; i < N; i++) if (eligible(VAL[i])) n++;
   $('headline').innerHTML = change
-    ? `<b class="${tot >= 0 ? 'up' : 'down'}">${sgn(tot)}</b> squares on fire per day, ${viewTitle().toLowerCase()}`
+    ? `<b class="${tot >= 0 ? 'up' : 'down'}">${sgn(tot)}</b> detected cells/day vs the year before, ${viewTitle().toLowerCase()}`
     : `<b>≈ ${fmt(tot)}</b> squares on fire per day, ${viewTitle().toLowerCase()}`;
   $('tbSub').textContent = change ? `${sgn(tot)} squares/day vs the year before` : `≈ ${fmt(tot)} squares on fire per day`;
   $('headSub').textContent = `${fmt(n)} squares shown, each about ${Math.round(RES * 111)} km wide`;

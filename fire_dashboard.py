@@ -159,6 +159,67 @@ def build_europe(frame,tau,ireland):
     return payload
 
 
+def build_cached_seasons():
+    """Render the partner's seasons view from monthly tables, with no acquisition helpers."""
+    cache=ROOT/'data/climate_months.npz'
+    target=ROOT/'output/firms/climate_map.html'
+    if not cache.exists():
+        return target.exists()
+    paths=[ROOT/'data/static_0.25.npz',ROOT/'data/static_sources_0.25.npy',
+           ROOT/'data/ne_110m_admin_0_countries.geojson',ROOT/'climate_template.html']
+    if any(not p.exists() for p in paths):
+        raise FileNotFoundError('Missing cached seasons reference files; no data downloaded')
+    if target.exists() and target.stat().st_mtime_ns >= max(p.stat().st_mtime_ns for p in [cache,*paths]):
+        return True
+    with np.load(cache,allow_pickle=False) as source:
+        months={int(k[1:]):source[k] for k in source.files if re.fullmatch(r'm\d+',k)}
+        first,last=str(source['first']),str(source['last'])
+    keys=sorted(months)
+    if len(keys)<12 or any(b-a!=1 for a,b in zip(keys[-24:],keys[-24:][1:])):
+        raise ValueError('Seasons require at least 12 consecutive cached complete months')
+    for values in months.values():
+        if values.shape!=(720*1440,) or not np.isfinite(values).all() or ((values<0)|(values>1)).any():
+            raise ValueError('Invalid cached monthly detection-day fractions')
+    # The existing local country cache stores its names as an object array.
+    with np.load(paths[0],allow_pickle=True) as source:
+        country=source['country'].ravel();names=list(source['names'])
+    static=np.load(paths[1],allow_pickle=False)
+    recent,before=keys[-12:],keys[-24:-12] if len(keys)>=24 else []
+    b=np.zeros((12,720*1440),np.float32);a=np.zeros_like(b)
+    for key in recent:b[key%12]=months[key]
+    for key in before:a[key%12]=months[key]
+    ids=np.arange(720*1440);lat=-90+(ids//1440+.5)*.25;lon=-180+(ids%1440+.5)*.25
+    maximum=np.maximum(a.max(0),b.max(0))
+    valid=((country>=0)|(maximum>0))&~static&(lat>-60)&(lat<80)
+    cells=ids[valid];keep=cells[maximum[cells]>=.01]
+    countries=np.where(country[keep]>=0,np.asarray(names,dtype=object)[np.maximum(country[keep],0)],'Ocean / unassigned')
+    codes,unique=pd.factorize(countries)
+    mat=lambda values:[np.round(values[m,keep]*1000).astype(int).tolist() for m in range(12)]
+    data={'lat':np.round(lat[keep],3).tolist(),'lon':np.round(lon[keep],3).tolist(),
+          'cty':codes.tolist(),'countries':[str(x) for x in unique],'B':mat(b),'A':mat(a) if before else None}
+    month_names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    label=lambda ks:f'{month_names[ks[0]%12]} {ks[0]//12} - {month_names[ks[-1]%12]} {ks[-1]//12}'
+    totals={name:[round(float(values[m,cells].sum()),1) for m in range(12)] for name,values in [('B',b),('A',a)]}
+    meta={'recent':label(recent),'before':label(before) if before else None,
+          'totals':{'B':totals['B'],'A':totals['A'] if before else None},
+          'now_month':int(pd.Timestamp.now(tz='UTC').month)-1,
+          'rows':[['Fire data',f'NASA FIRMS VIIRS, {first} to {last}'],['Months used',f'{len(keys)} complete months'],
+                  ['Grid','0.25 degree cells'],['Method','VIIRS only; not the harmonized MODIS + VIIRS calendar']]}
+    borders=[]
+    for feature in json.loads(paths[2].read_text(encoding='utf-8'))['features']:
+        g=feature['geometry'];polygons=g['coordinates'] if g['type']=='MultiPolygon' else [g['coordinates']]
+        borders.extend([[[round(y,2),round(x,2)] for x,y,*_ in polygon[0]] for polygon in polygons])
+    html=paths[3].read_text(encoding='utf-8')
+    for token,value in {'__DATA__':data,'__BORDERS__':borders,'__META__':meta,'__RES__':.25}.items():
+        html=html.replace(token,safe_json(value))
+    target.parent.mkdir(parents=True,exist_ok=True)
+    temp=target.with_suffix('.html.part');temp.write_text(html,encoding='utf-8');temp.replace(target)
+    pd.DataFrame({'month':month_names,'burning_squares_recent':totals['B'],
+                  'burning_squares_before':totals['A'] if before else np.nan}).to_csv(target.parent/'climate_by_month.csv',index=False)
+    print(f'Built cached VIIRS seasons: {len(keep):,} cells; {label(recent)}; no downloads',flush=True)
+    return True
+
+
 def build(refresh=False):
     out=ROOT/'output/firms'; spread=ROOT/'output/spread'
     forecast=out/'forecast_latest.csv'
@@ -200,6 +261,9 @@ def build(refresh=False):
             polys=[coords] if geometry['type']=='Polygon' else coords
             for polygon in polys: borders.append([[lat,lon] for lon,lat,*rest in polygon[0]])
     html=(ROOT/'map_template.html').read_text(encoding='utf-8')
+    if not build_cached_seasons():
+        html=html.replace('<a class="btn" href="climate_map.html">Seasons and years</a>',
+                          '<span class="hint">VIIRS seasons cache unavailable. Use the MODIS + VIIRS calendar.</span>')
     telemetry_js=(ROOT/'scripts/fire_telemetry.js').read_text(encoding='utf-8')
     sensors_js=(ROOT/'scripts/fire_sensors_ui.js').read_text(encoding='utf-8')
     html=html.replace('/*__SENSOR_CODE__*/',telemetry_js+'\n'+sensors_js)
@@ -392,9 +456,7 @@ def start(port):
     if not (ROOT/'output/history/history_latest.json').exists() and package.exists():
         print('Building the fire history calendar...',flush=True)
         subprocess.run([sys.executable,str(ROOT/'fire_history.py'),'--package',str(package)],cwd=ROOT,check=False)
-    if not (ROOT/'output/firms/climate_map.html').exists() and (ROOT/'data/climate_months.npz').exists():
-        print('Building the seasons map...',flush=True)
-        subprocess.run([sys.executable,str(ROOT/'fire_forecast.py'),'climate','--reuse'],cwd=ROOT,check=False)
+    build_cached_seasons()
     build(True)
     serve(port)
 

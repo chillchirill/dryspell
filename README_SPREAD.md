@@ -187,6 +187,17 @@ and four corners are inside a single country polygon. Border/coastal cells and
 territories absent from the handoff are excluded. This is regional coverage,
 not arbitrary AOI selection or complete national coverage.
 
+### Separate VIIRS seasons view
+
+The existing **Seasons and years** link opens `/climate_map.html`. It is a
+VIIRS-only two-year seasonal overview, separate from harmonization. Dashboard
+`build` renders it from `data/climate_months.npz` and the existing country/static
+caches, with no fire-file scanning or acquisition helpers. The monthly cache is
+also supplied as `harmonization_handoff/data/climate_months.npz` in the existing
+handoff ZIP (1.901 MB); it is not part of Git. If neither this cache nor a built
+seasons page exists, the dashboard shows an unavailable note instead of a broken
+link. The seasons page links back to the calendar and directly to the forecast.
+
 ### One series, explicit provenance
 
 The observed measure is **detected grid-cell days**: each cell with one or more
