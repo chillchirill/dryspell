@@ -1,0 +1,47 @@
+{
+  "approved_limit_bytes": 25000000,
+  "planned_pixel_bytes": 20884412,
+  "network_bytes_this_run": 0,
+  "created_utc": "2026-11-15T00:01:35.086498Z",
+  "files": {
+    "ireland-0.json.gz": {
+      "bytes": 738498,
+      "sha256": "fdc5325deae230accda16f1d926417d0d561ceda43e86732c2bfce71bf1b6521"
+    },
+    "ireland-1.json.gz": {
+      "bytes": 1012735,
+      "sha256": "9c01734059a026861a83bfc4f521d512fe23c817c5b5dc48e353244e4d6b4591"
+    },
+    "ireland-2.json.gz": {
+      "bytes": 1022352,
+      "sha256": "9d2532d229b9cd7c5c1834d6f3873b6b40818ea4f590513f539b35a385ae4b90"
+    },
+    "ireland-3.json.gz": {
+      "bytes": 951155,
+      "sha256": "af80db095eb352c4111aa2f14651efc3e5d7bc118116405fe6d7d6188e03fc99"
+    },
+    "ireland-4.json.gz": {
+      "bytes": 1016400,
+      "sha256": "327b9d44f733c102d4f8a4deaa98e71aec71a0334e6b58a01e1d28447e60bab2"
+    },
+    "ireland-5.json.gz": {
+      "bytes": 1022911,
+      "sha256": "28498f911523834d6bfbf052ddec594b5974153287ed2d3c62e54980cc1f8fa2"
+    },
+    "ireland-6.json.gz": {
+      "bytes": 992727,
+      "sha256": "db88c91af594b6f365ecab7dc26825fd9c94f8de6bd8dd02171700f2aa35e6c5"
+    }
+  },
+  "sources": [
+    "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N54W006_Map.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N54_00_W006_00_DEM/Copernicus_DSM_COG_10_N54_00_W006_00_DEM.tif",
+    "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N54W009_Map.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N54_00_W007_00_DEM/Copernicus_DSM_COG_10_N54_00_W007_00_DEM.tif",
+    "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N51W009_Map.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N53_00_W007_00_DEM/Copernicus_DSM_COG_10_N53_00_W007_00_DEM.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_W007_00_DEM/Copernicus_DSM_COG_10_N52_00_W007_00_DEM.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N53_00_W008_00_DEM/Copernicus_DSM_COG_10_N53_00_W008_00_DEM.tif"
+  ],
+  "method": "Bounded COG blocks; nearest pixel centres; RasterPixelIsPoint corrected; south-to-north output rows"
+}

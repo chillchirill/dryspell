@@ -2,12 +2,15 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wildfire forecast</title>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preconnect" href="https://server.arcgisonline.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root { --bg:#e9ebee; --panel:#ffffff; --line:#d9dce1; --fg:#1a1d21; --muted:#646b76; --hover:#f2f3f5; --hot:#d9480f; }
 body.dark { --bg:#0e1013; --panel:#191c20; --line:#30343b; --fg:#eceef1; --muted:#9aa1ac; --hover:#252930; --hot:#ff8a3d; }
 * { box-sizing:border-box; }
+[hidden] { display:none !important; }
 html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
   font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
 #map { position:absolute; inset:0; background:var(--bg); }
@@ -16,7 +19,7 @@ html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
 .cells-glow { filter:blur(7px); mix-blend-mode:screen; animation:breathe 3.4s ease-in-out infinite; }
 body.noglow .cells-glow { display:none; }
 @keyframes breathe { 0%,100% { opacity:.25; } 50% { opacity:.6; } }
-.leaflet-cells-pane { transition:opacity 1.6s ease-out; }
+.leaflet-cells-pane { transition:opacity .35s ease-out; }
 
 .panel { position:absolute; z-index:1000; top:12px; left:12px; width:300px; max-height:calc(100% - 24px);
   display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:8px;
@@ -36,6 +39,7 @@ body.noglow .cells-glow { display:none; }
 h2 { margin:0 0 6px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; gap:8px; }
 h2 span { font-weight:400; color:var(--muted); }
 .num { font-variant-numeric:tabular-nums; }
+a { color:var(--hot); text-decoration:none; } a:hover { text-decoration:underline; }
 .summary b { font-weight:600; }
 .hint { color:var(--muted); font-size:12.5px; }
 
@@ -85,6 +89,18 @@ td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
 .days button:hover { background:var(--hover); }
 .days button.on { color:var(--fg); font-weight:600; }
 #time { margin:0; }
+.tb-close { flex:none; align-self:flex-start; width:26px; height:26px; border:1px solid var(--line); border-radius:6px; background:none;
+  color:var(--muted); font:inherit; line-height:1; cursor:pointer; }
+.tb-close:hover { background:var(--hover); color:var(--fg); }
+.nav { display:flex; gap:6px; }
+.nav.col { display:grid; }
+.nav .btn { flex:1; text-align:center; }
+a.btn { display:block; color:var(--fg); text-decoration:none; }
+a.btn:hover { text-decoration:none; }
+.viewnote { position:absolute; z-index:900; top:14px; left:50%; transform:translateX(-50%);
+  max-width:max(230px, min(460px, calc(100% - 680px))); padding:8px 12px; background:var(--panel); border:1px solid var(--line);
+  border-radius:8px; font-size:13px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.18); pointer-events:none; }
+.history-view .viewnote, .simulation-view .viewnote { display:none; }
 
 .form { display:grid; gap:6px; }
 .form input[type=text], .form select { width:100%; font:inherit; color:var(--fg); background:var(--panel);
@@ -131,7 +147,8 @@ body.picking .leaflet-container { cursor:crosshair; }
 
 @media (max-width:640px) {
   .panel { top:auto; bottom:8px; left:8px; right:8px; width:auto; max-height:55vh; }
-  .panel.right { top:118px; bottom:auto; left:8px; right:8px; width:auto; max-height:45vh; }
+  .panel.right { top:8px; bottom:auto; left:8px; right:8px; width:auto; max-height:45vh; }
+  body.days-on .panel.right { top:118px; }
   .head { padding:10px 12px; }
   .timebar { left:8px; right:8px; top:8px; bottom:auto; }
   .tb { padding:8px 12px 8px 8px; gap:10px; }
@@ -139,6 +156,7 @@ body.picking .leaflet-container { cursor:crosshair; }
   .tb-date { font-size:17px; }
   .tb-sub { display:none; }
   .leaflet-control-zoom { display:none; }
+  .viewnote { top:auto; bottom:76px; max-width:calc(100% - 24px); width:max-content; }
   .leaflet-bottom.leaflet-right { bottom:72px; }
   .leaflet-control-attribution { font-size:9px; }
 }
@@ -193,43 +211,51 @@ body:not(.dark) .spread-key { color:#6d28d9; }
   <div class="body">
     <section class="summary">
       <h2>Worldwide forecast totals</h2>
-      <div><b class="num" id="sExp">–</b> cells expected to have fire</div>
+      <div><b class="num" id="sExp">–</b> squares expected to have fire, <span id="sDay">next 24 h</span></div>
       <div class="hint"><span class="num" id="sCells">–</span> squares shown, each about <span id="km"></span> km wide</div>
-      <div class="spread-actions" style="margin-top:8px"><button class="btn" id="view-ireland">Ireland</button><button class="btn" id="view-world">World</button></div>
-      <button class="btn" id="history-open" style="margin-top:8px" disabled>Fire history &amp; calendar</button>
-      <button class="btn" id="simulation-open" style="margin-top:8px">Ireland fire simulation</button>
+    </section>
+
+    <section>
+      <h2>Go to</h2>
+      <div class="nav"><button class="btn" id="view-ireland">Ireland</button><button class="btn" id="view-world">World</button></div>
+      <h2 style="margin-top:12px">Other views</h2>
+      <div class="nav col">
+        <button class="btn" id="history-open" disabled>Fire history calendar</button>
+        <button class="btn" id="simulation-open">Ireland fire simulation</button>
+        <a class="btn" href="climate_map.html">Seasons and years</a>
+      </div>
     </section>
 
     <section>
       <h2>Show probability from <span class="num" id="thrVal">1%</span></h2>
       <input type="range" id="thr" min="0" max="17" step="1" value="0" aria-label="Minimum fire probability">
       <div class="ticks"><span>1%</span><span>10%</span><span>40%</span><span>90%</span></div>
+      <div id="legend" style="margin-top:10px"></div>
     </section>
 
     <section>
-      <h2>Chance of fire <span>squares</span></h2>
-      <div id="legend"></div>
-    </section>
-
-    <section>
+      <h2>Show on the map</h2>
+      <label class="check" id="daysToggleRow"><input type="checkbox" id="daysToggle">Next days<small id="nDays"></small></label>
+      <div class="hint">Opens a day slider. Off: the next 24 hours.</div>
+      <label class="check"><input type="checkbox" id="spread-enabled" checked>Wind and fire-spread arrows</label>
       <label class="check"><input type="checkbox" id="fresh">Only new fire areas<small id="nFresh"></small></label>
       <div class="hint"><span class="key"></span> No fire within ~100 km for 7 days</div>
       <label class="check"><input type="checkbox" id="dets">Fires seen by satellite, last 24 h<small id="nDets"></small></label>
     </section>
 
-
     <section id="spread-section" aria-label="Wind and fire spread">
       <h2><span class="spread-key" aria-hidden="true">&#8599;</span> Wind &amp; fire spread</h2>
-      <div class="spread-controls">
-        <label class="check"><input type="checkbox" id="spread-enabled" checked>Show direction arrows</label>
-        <label class="field"><span>Source</span><select id="spread-source" aria-label="Spread source"><option value="combined">World + regional scenarios</option><option value="ireland">Ireland scenarios only</option><option value="europe">UK / Spain / France scenarios</option><option value="active">Active fires only</option><option value="scenario">Top-50 new-ignition scenarios</option></select></label>
-        <label class="field"><span>Arrows</span><select id="spread-kind" aria-label="Direction type"><option value="spread">Estimated fire spread</option><option value="wind">Wind blows toward</option></select></label>
-        <label class="field"><span>Horizon</span><select id="spread-hour" aria-label="Spread forecast horizon"><option value="6">+6 hours</option><option value="12">+12 hours</option><option value="18">+18 hours</option><option value="24" selected>+24 hours</option></select></label>
-      </div>
       <p id="spread-status" class="spread-status" role="status" aria-live="polite">Loading spread snapshot...</p>
-      <div class="hint">Arrows follow the probability and new-area filters. Scenarios show spread if a fire occurs; they are not confirmed fires. Select a horizon to see the forecast wind change.</div>
-      <div class="spread-actions"><button class="btn" id="spread-refresh">Refresh</button><button class="btn" id="spread-locate">Find a fire</button></div>
+      <div class="spread-actions"><button class="btn" id="spread-locate">Find a fire</button><button class="btn" id="spread-refresh">Refresh</button></div>
       <div id="spread-selected" class="spread-selected" hidden></div>
+      <details style="margin-top:8px"><summary>Arrow options</summary>
+        <div class="spread-controls">
+          <label class="field"><span>Source</span><select id="spread-source" aria-label="Spread source"><option value="combined">World + regional scenarios</option><option value="ireland">Ireland scenarios only</option><option value="europe">UK / Spain / France scenarios</option><option value="active">Active fires only</option><option value="scenario">Top-50 new-ignition scenarios</option></select></label>
+          <label class="field"><span>Arrows</span><select id="spread-kind" aria-label="Direction type"><option value="spread">Estimated fire spread</option><option value="wind">Wind blows toward</option></select></label>
+          <label class="field"><span>Horizon</span><select id="spread-hour" aria-label="Spread forecast horizon"><option value="6">+6 hours</option><option value="12">+12 hours</option><option value="18">+18 hours</option><option value="24" selected>+24 hours</option></select></label>
+        </div>
+        <div class="hint">Arrows follow the probability and new-area filters. Scenarios show spread if a fire occurs; they are not confirmed fires. Arrows exist for the next 24 hours only.</div>
+      </details>
       <details style="margin-top:8px"><summary>Browse fires</summary><div class="spread-list" id="spread-list"></div></details>
     </section>
 
@@ -275,6 +301,8 @@ body:not(.dark) .spread-key { color:#6d28d9; }
         <div><button class="btn primary" id="iotConnect">Connect</button> <button class="btn" id="iotDisconnect" disabled>Disconnect</button></div>
       </div>
       <div id="iotConnection" role="status">Not connected</div>
+      <div id="iotTransport" class="hint">No messages received.</div>
+      <button class="btn" id="iotDetected" hidden>Use detected device ID</button>
       <div id="iotMessage" class="hint" role="status"></div>
       <div class="hint">Live temperature observations. Forecast probabilities stay separate. Readings become stale after 2 minutes. Controller locations are saved in this browser.</div>
     </section>
@@ -296,14 +324,16 @@ body:not(.dark) .spread-key { color:#6d28d9; }
   </div>
 </aside>
 
-<div class="timebar" id="timebar"><div class="tb">
+<div class="timebar" id="timebar" hidden><div class="tb">
   <button class="playbtn" id="play" aria-label="Play or pause the forecast"></button>
   <div class="tb-main">
     <div class="tb-top"><span class="tb-date" id="tbDate"></span><span class="tb-sub" id="tbSub"></span><span class="tb-exp"><b id="tbExp"></b> burning</span></div>
     <input type="range" id="time" min="0" max="100" value="0" aria-label="Forecast day">
     <div class="days" id="days"></div>
   </div>
+  <button class="tb-close" id="daysClose" aria-label="Hide the day slider" title="Hide the day slider">&times;</button>
 </div></div>
+<div id="viewNote" class="viewnote" role="status" hidden></div>
 
 <script>
 const D = __DATA__;
@@ -330,7 +360,7 @@ const calm = matchMedia('(prefers-reduced-motion:reduce)').matches;
 
 // ---- state (remembered per browser) -------------------------------------------------
 const state = {step: 0, mode: 'gradient', opacity: 90, base: 'dark', fresh: false, dets: false, borders: true,
-               glow: !phone.matches, autoplay: true, open: !phone.matches, iotOpen: false};
+               glow: !phone.matches, autoplay: false, open: !phone.matches, iotOpen: false};
 try { Object.assign(state, JSON.parse(localStorage.getItem('wildfireMap3') || '{}')); } catch (e) {}
 if (!BASES[state.base]) state.base = 'dark';
 const save = () => { try { localStorage.setItem('wildfireMap3', JSON.stringify(state)); } catch (e) {} };
@@ -416,7 +446,9 @@ const eligibleP = (i, p) => p >= STEPS[state.step] / 100 && (!state.fresh || FR[
 const BK = new Uint8Array(N), X0 = new Int32Array(N), Y0 = new Int32Array(N), WW = new Int32Array(N), HH = new Int32Array(N);
 const colX = new Int32Array(NX + 1), rowY = new Int32Array(NY + 1);
 const CNT = new Int32Array(NB + 2), POS = new Int32Array(NB + 2), ORD = new Int32Array(N);
+let viewCells = 0;                        // squares drawn in the current view (for the "nothing here" note)
 function draw() {
+  viewCells = 0;
   const size = map.getSize(), dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = Math.round(size.x * dpr), Hh = Math.round(size.y * dpr);
   for (const c of [cv, gl]) {
@@ -448,6 +480,7 @@ function draw() {
     for (let i = 0; i < N; i++) if (BK[i] !== 255) CNT[BK[i] + 1]++;
     for (let b = 0; b < nb; b++) CNT[b + 1] += CNT[b];
     POS.set(CNT);
+    viewCells += CNT[nb];
     for (let i = 0; i < N; i++) if (BK[i] !== 255) ORD[POS[BK[i]]++] = i;
     for (let b = 0; b < nb; b++) {
       if (CNT[b + 1] === CNT[b]) continue;
@@ -497,6 +530,9 @@ function stats(full) {
   $('sCells').textContent = fmt(n);
   if (!full) return;
   $('thrVal').textContent = STEPS[state.step] + '%';
+  $('viewNote').hidden = viewCells > 0;
+  if (!viewCells) $('viewNote').textContent = `No squares at ${STEPS[state.step]}% or higher in this view` +
+    (state.fresh ? ' with "Only new fire areas" on' : '') + '. Fire risk here is low: zoom out or lower the threshold.';
   const bar = state.mode === 'classes' ? '' :
     `<div class="bar" style="background:linear-gradient(90deg,${RAMP[theme()].map(([u, c]) => `rgb(${c}) ${u * 100}%`).join(',')})"></div>` +
     '<div class="ticks" style="margin-bottom:8px"><span>1%</span><span>3%</span><span>10%</span><span>30%</span><span>100%</span></div>';
@@ -561,7 +597,8 @@ function popupHtml(i, k) {
       <tr><td>Days since rain</td><td>${D.dsr[i]}</td></tr>
       <tr><td>Fires seen, last 24 h</td><td>${D.det[i]}</td></tr>
     </table>
-    ${FR[i] ? '<div class="pop-new">New fire area: nothing burned within about 100 km in the last 7 days.</div>' : ''}`;
+    ${FR[i] ? '<div class="pop-new">New fire area: nothing burned within about 100 km in the last 7 days.</div>' : ''}
+    ${window.FireSimulation?.buttonFor(D.lat[i],D.lon[i],k)||''}`;
 }
 map.on('mousemove', e => {
   const i = (typeof picking === 'function' && picking()) ? -1 : cellAt(e.latlng);
@@ -604,6 +641,7 @@ function timeUI() {
   shownDay = k;
   window.FireSpreadLayer?.refresh();
   $('tbDate').textContent = days[k].title;
+  $('sDay').textContent = k === 0 ? 'next 24 h' : days[k].title;
   $('tbSub').textContent = `${days[k].span} · day ${k + 1} of ${K}`;
   document.querySelectorAll('#days button').forEach((b, j) => b.classList.toggle('on', j === k));
   if (popup && popCell >= 0 && map.hasLayer(popup)) popup.setContent(popupHtml(popCell, k));
@@ -614,7 +652,16 @@ $('time').max = Math.max(1, (K - 1) * 100);
 $('time').oninput = e => { setPlaying(false, true); t = +e.target.value / 100; dirty = true; };
 $('time').onchange = () => { goto = dayNow(); };
 $('play').onclick = () => setPlaying(!playing, true);
-if (K < 2) $('timebar').style.display = 'none';
+// The day slider is opt-in: hidden until "Next days" is ticked, and it never starts playing by itself.
+function showDays(on) {
+  on = on && K > 1;
+  $('daysToggle').checked = on; $('timebar').hidden = !on; document.body.classList.toggle('days-on', on);
+  if (!on) { setPlaying(false); goto = null; if (t !== 0) { t = 0; dirty = true; } }
+}
+$('daysToggle').onchange = e => showDays(e.target.checked);
+$('daysClose').onclick = () => showDays(false);
+if (K < 2) { $('daysToggleRow').hidden = true; $('daysToggleRow').nextElementSibling.hidden = true; }
+else $('nDays').textContent = `${K} days`;
 
 let last = performance.now(), lastFull = 0;
 function frame(now) {
@@ -663,7 +710,6 @@ $('meta').innerHTML = META.rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td><
 applyBase();
 setPlaying(false);
 requestAnimationFrame(now => { last = now; frame(now); applyOverlays(); });   // first draw, then fade the squares in
-if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
 </script>
 
 <script type="application/json" id="spread-payload">{}</script>
@@ -751,7 +797,8 @@ if (state.autoplay && !calm) setTimeout(() => setPlaying(true), 2200);
       <tr><td>Estimated spread toward</td><td>${compass(frame.spread_bearing_deg)}</td></tr>
       <tr><td>Head-fire travel</td><td>${frame.cumulative_head_distance_km.toFixed(2)} km</td></tr>
       <tr><td>Satellite detections</td><td>${fmt(p.n_points)}</td></tr></table>
-      <div class="hint">Cached weather forecast, not live station readings. ${p.source==='scenario'?'Conditional on a fire occurring. ':''}${model}. Travel is a heuristic estimate, not a burned perimeter.</div>`;
+      <div class="hint">Cached weather forecast, not live station readings. ${p.source==='scenario'?'Conditional on a fire occurring. ':''}${model}. Travel is a heuristic estimate, not a burned perimeter.</div>
+      ${window.FireSimulation?.buttonFor(feature.geometry.coordinates[1],feature.geometry.coordinates[0])||''}`;
   }
   function selectFeature(id,focus=false) {
     selected=dataset()?.features.find(f=>f.id===id)||null;

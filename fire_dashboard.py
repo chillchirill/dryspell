@@ -1,9 +1,11 @@
 r"""Build/serve the partner's map with cached probability and spread forecasts.
 
-  .venv\Scripts\python.exe fire_dashboard.py build --refresh-spread
-  .venv\Scripts\python.exe fire_dashboard.py serve --port 8000
+  python fire_dashboard.py start                    # everything in one go: prepare, build, serve
+  python fire_dashboard.py build --refresh-spread   # rebuild only (cached inputs, no downloads)
+  python fire_dashboard.py serve --port 8000        # serve an already built map
 
-No training, weather/FIRMS downloads, credentials, commits or deployment.
+`build` and `serve` do no training, weather/FIRMS downloads, credentials, commits or deployment.
+`start` may download one small file: the GFS wind forecast for the arrows (about 4 MB), if it is not cached.
 The local server binds to 127.0.0.1 and serves the map, cached JSON and offline simulation:
   GET /api/forecast             columnar probability data + UTC day windows
   GET /api/spread?source=active GeoJSON, source=active|scenario|ireland|europe
@@ -13,11 +15,14 @@ Re-run build --refresh-spread after the partner updates forecast_latest.csv.
 """
 from __future__ import annotations
 import argparse
+import gzip
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
 import subprocess
+import sys
+import threading
 from types import SimpleNamespace
 from urllib.parse import urlsplit, parse_qs
 
@@ -39,6 +44,14 @@ def embedded_constant(html,name):
 
 def safe_json(value):
     return json.dumps(value,ensure_ascii=False,allow_nan=False,separators=(',',':')).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
+
+
+def compact(value,digits=5):
+    """Round floats for the copy embedded in the page; files and the API keep full precision."""
+    if isinstance(value,float): return round(value,digits)
+    if isinstance(value,list): return [compact(v,digits) for v in value]
+    if isinstance(value,dict): return {k:compact(v,digits) for k,v in value.items()}
+    return value
 
 
 def forecast_payload(frame,previous_html=''):
@@ -163,7 +176,9 @@ def build(refresh=False):
     snapshots={}
     for source in ['active','scenario']:
         path=spread/f'spread_{source}.geojson'
-        if not path.exists(): raise FileNotFoundError(f'Missing {path.name}; use build --refresh-spread')
+        if not path.exists():
+            raise FileNotFoundError(f'Missing {path.name}. Run:  python fire_dashboard.py start  '
+                                    '(or build --refresh-spread when the wind cache exists)')
         snapshot=json.loads(path.read_text(encoding='utf-8'))
         if snapshot['metadata']['issued_at_utc']!=utc(tau):
             raise ValueError(f'{source} spread and probability issue times differ; use build --refresh-spread')
@@ -173,6 +188,8 @@ def build(refresh=False):
     recent_path=spread/'recent_detections.json'
     recent=json.loads(recent_path.read_text()) if recent_path.exists() else {}
     points=recent.get('points',[]) if recent.get('issued_at_utc')==utc(tau) else []
+    # float32 values print with 17 digits: keep what the map can show (about 10 m, 0.1 MW)
+    points=[[round(float(a),4),round(float(b),4),round(float(c),1)] for a,b,c in points]
     borders=embedded_constant(old,'B')
     if borders is None:
         geo=ROOT/'data/ne_110m_admin_0_countries.geojson'
@@ -192,7 +209,7 @@ def build(refresh=False):
                          '__META__':payload['metadata'],'__COLORS__':COLORS,'__RES__':.25}.items():
         html=html.replace(token,safe_json(value))
     html=html.replace('<script type="application/json" id="spread-payload">{}</script>',
-                      '<script type="application/json" id="spread-payload">'+safe_json(snapshots)+'</script>')
+                      '<script type="application/json" id="spread-payload">'+safe_json(compact(snapshots))+'</script>')
     history_path=ROOT/'output/history/history_latest.json'
     if history_path.exists():
         history=json.loads(history_path.read_text(encoding='utf-8'))
@@ -220,14 +237,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
         parts=urlsplit(self.path)
         if parts.path in ['/','/forecast_map.html']:
             path=ROOT/'output/firms/forecast_map.html'; content_type='text/html; charset=utf-8'
+        elif parts.path=='/climate_map.html':
+            path=ROOT/'output/firms/climate_map.html'; content_type='text/html; charset=utf-8'
         elif parts.path=='/api/forecast':
             path=ROOT/'output/firms/forecast_web.json'; content_type='application/json'
         elif parts.path=='/api/simulation/environment':
             from fire_simulation import environment
             try:
-                return self.json_response(environment())
+                return self.json_response(environment(parse_qs(parts.query).get('site',['glendalough'])[0]))
+            except ValueError as error:
+                return self.json_response({'error':str(error)},400)
             except FileNotFoundError:
                 return self.json_response({'error':'Prepared Ireland simulation is unavailable'},503)
+        elif parts.path=='/api/simulation/sites':
+            from fire_simulation import sites
+            return self.json_response(sites())
+        elif parts.path=='/api/simulation/wind':
+            from fire_simulation import forecast_wind
+            query=parse_qs(parts.query)
+            try:
+                return self.json_response(forecast_wind(float(query.get('lat',[''])[0]),
+                    float(query.get('lon',[''])[0]),int(query.get('duration',['3600'])[0])))
+            except ValueError as error:
+                return self.json_response({'error':str(error)},400)
+            except FileNotFoundError:
+                return self.json_response({'error':'Matching cached GFS wind is unavailable; no data downloaded'},503)
         elif parts.path=='/api/history':
             path=ROOT/'output/history/history_latest.json'; content_type='application/json'
         elif parts.path=='/api/history/detections':
@@ -259,9 +293,33 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             return self.json_response({'error':'not found'},404)
         if not path.exists(): return self.json_response({'error':'snapshot unavailable; build cached dashboard first'},503)
+        self.send_file(path,content_type)
+
+    _compressed={}
+
+    @classmethod
+    def compressed(cls,path,tag=None,data=None):
+        """Gzip a file once per version; later requests reuse the result."""
+        if tag is None:
+            stat=path.stat(); tag=f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+        cached=cls._compressed.get(str(path))
+        if not cached or cached[0]!=tag:
+            cached=(tag,gzip.compress(path.read_bytes() if data is None else data,5)); cls._compressed[str(path)]=cached
+        return cached[1]
+
+    def send_file(self,path,content_type):
+        """Send a file gzip-compressed when the browser accepts it; an unchanged file answers 304."""
+        stat=path.stat(); tag=f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+        if self.headers.get('If-None-Match')==tag:
+            self.send_response(304); self.send_header('ETag',tag); self.end_headers(); return
+        data=path.read_bytes()
         self.send_response(200); self.send_header('Content-Type',content_type)
-        self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff')
-        data=path.read_bytes(); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
+        # no-cache = always ask the server, so a rebuilt map is never shown stale
+        self.send_header('Cache-Control','no-cache'); self.send_header('ETag',tag)
+        self.send_header('X-Content-Type-Options','nosniff')
+        if 'gzip' in self.headers.get('Accept-Encoding','') and len(data)>4096:
+            data=self.compressed(path,tag,data); self.send_header('Content-Encoding','gzip'); self.send_header('Vary','Accept-Encoding')
+        self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
 
     def do_POST(self):
         if urlsplit(self.path).path != '/api/simulation/run':
@@ -301,20 +359,56 @@ class DashboardHandler(BaseHTTPRequestHandler):
         pass
 
 
+def serve(port):
+    if not (ROOT/'output/firms/forecast_map.html').exists():
+        raise SystemExit('The map is not built yet. Run:  python fire_dashboard.py start')
+    server=ThreadingHTTPServer(('127.0.0.1',port),DashboardHandler)
+    # compress the big page before the first visitor arrives
+    threading.Thread(target=DashboardHandler.compressed,args=(ROOT/'output/firms/forecast_map.html',),daemon=True).start()
+    print(f'Dashboard: http://127.0.0.1:{server.server_port}/   (Ctrl+C to stop)',flush=True)
+    try: server.serve_forever()
+    except KeyboardInterrupt: pass
+    finally: server.server_close()
+
+
+def start(port):
+    """Prepare everything the map needs, build it and serve it."""
+    forecast=ROOT/'output/firms/forecast_latest.csv'
+    if not forecast.exists():
+        raise SystemExit('No forecast yet. Run first:  python fire_forecast.py predict')
+    tau=pd.Timestamp(pd.read_csv(forecast,usecols=['valid_from_utc'],nrows=1).valid_from_utc.iloc[0])
+    if tau.tzinfo is not None: tau=tau.tz_convert('UTC').tz_localize(None)
+    import fire_spread as fs
+    try:
+        fs.cached_latest_wind_uv(tau)
+    except FileNotFoundError:
+        import gfs_weather as gw
+        print('Wind forecast for the arrows is not cached: downloading it from NOAA GFS (about 4 MB)...',flush=True)
+        gw.latest_wind_uv(tau,ROOT/'data/gfs_uv')
+    # optional extras: skipped quietly when their inputs are not on this computer
+    package=ROOT/'output/harmonization_handoff.zip'
+    if not (ROOT/'output/history/history_latest.json').exists() and package.exists():
+        print('Building the fire history calendar...',flush=True)
+        subprocess.run([sys.executable,str(ROOT/'fire_history.py'),'--package',str(package)],cwd=ROOT,check=False)
+    if not (ROOT/'output/firms/climate_map.html').exists() and (ROOT/'data/climate_months.npz').exists():
+        print('Building the seasons map...',flush=True)
+        subprocess.run([sys.executable,str(ROOT/'fire_forecast.py'),'climate','--reuse'],cwd=ROOT,check=False)
+    build(True)
+    serve(port)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('mode',choices=['build','serve'])
+    parser.add_argument('mode',choices=['start','build','serve'])
     parser.add_argument('--refresh-spread',action='store_true')
     parser.add_argument('--port',type=int,default=8000)
     args=parser.parse_args()
-    if args.mode=='build': build(args.refresh_spread)
-    else:
-        if not (ROOT/'output/firms/forecast_map.html').exists(): raise FileNotFoundError('Build the dashboard first')
-        server=ThreadingHTTPServer(('127.0.0.1',args.port),DashboardHandler)
-        print(f'Dashboard: http://127.0.0.1:{server.server_port}/',flush=True)
-        try: server.serve_forever()
-        except KeyboardInterrupt: pass
-        finally: server.server_close()
+    if args.mode=='start': start(args.port)
+    elif args.mode=='build':
+        try: build(args.refresh_spread)
+        except FileNotFoundError as error:
+            raise SystemExit(f'{error}\nTip: "python fire_dashboard.py start" prepares the missing inputs and builds the map.')
+    else: serve(args.port)
 
 
 if __name__=='__main__':

@@ -16,6 +16,8 @@ map.createPane('sensors').style.zIndex = 620;
 const sensorGroup = L.featureGroup().addTo(map);
 let picked = null, pickMarker = null, sensorSocket = null, sensorRetry = null;
 let sensorConnected = false, sensorWanted = false, sensorGeneration = 0, sensorAttempts = 0, sensorURL = '';
+let sensorSession=0,detectedDevice=null;
+let sensorStats={messages:0,accepted:0,rejected:0,lastMessageMs:null};
 function picking() { return document.body.classList.contains('picking'); }
 function setPicking(on) {
   document.body.classList.toggle('picking', on);
@@ -27,7 +29,8 @@ function saveSensors() {
 }
 function sensorDetails(d) {
   const r = readings.get(d.deviceId);
-  const status = d.deviceId ? FireTelemetry.status(r, sensorConnected) : 'Link device ID';
+  let status = d.deviceId ? FireTelemetry.status(r, sensorConnected) : 'Link device ID';
+  if(r && sensorConnected && r.socketSession!==sensorSession)status='Waiting for update';
   const time = r ? new Date(r.measuredMs).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC') : '';
   const basis = r?.timeSource === 'device' ? 'Measured' : r?.timeSource === 'server' ? 'Received by server' : 'Received in browser';
   return {status, temperature: r ? `${r.temperatureC.toFixed(1)} °C` : '—',
@@ -39,6 +42,9 @@ function sensorPopup(d, detail) {
     '<div class="hint">Ground observation. Separate from the cached fire forecast.</div>';
 }
 function renderSensors() {
+  $('iotTransport').textContent=sensorStats.messages
+    ? `${sensorStats.messages} messages · ${sensorStats.accepted} readings linked · ${sensorStats.rejected} invalid. Last message ${Math.max(0,Math.floor((Date.now()-sensorStats.lastMessageMs)/1000))}s ago.`
+    : sensorConnected?'Server connected. Waiting for the controller to send its first reading.':'No messages received in this connection.';
   const live = devices.filter(d => sensorDetails(d).status === 'Live').length;
   $('iotCount').textContent = devices.length ? `${devices.length} added · ${live} live` : 'None added';
   $('iotList').innerHTML = devices.map((d, k) => {
@@ -94,25 +100,31 @@ function openSensors(generation) {
     sensorWanted = false; saveSensorConnection(); sensorConnectionLabel('Connection unavailable'); return;
   }
   sensorSocket = socket;
+  const decode=FireTelemetry.createDecoder();
   const current = () => generation === sensorGeneration && sensorWanted;
   const timeout = setTimeout(() => {if (current() && socket.readyState === WebSocket.CONNECTING) socket.close();}, 10000);
   socket.onopen = () => {
     clearTimeout(timeout); if (!current()) return socket.close();
-    sensorConnected = true; sensorAttempts = 0; sensorConnectionLabel('Connected to controller server'); renderSensors();
+    sensorConnected = true; ++sensorSession; sensorAttempts = 0; sensorConnectionLabel('Connected to controller server'); renderSensors();
   };
   socket.onmessage = event => {
     if (!current()) return;
+    sensorStats.messages++;sensorStats.lastMessageMs=Date.now();
     try {
-      const reading = FireTelemetry.normalize(event.data);
-      if (!reading) return;
+      const incoming = decode(event.data);
+      for(const reading of incoming) {
       if (!devices.some(d => d.deviceId === reading.deviceId)) {
-        $('iotMessage').textContent = `Unlinked device: ${reading.deviceId}. Add it or use Link ID.`; return;
+        detectedDevice=reading.deviceId;$('iotDetected').hidden=false;
+        $('iotMessage').textContent = `Unlinked device: ${reading.deviceId}. Add it or use Link ID.`; continue;
       }
       const previous = readings.get(reading.deviceId);
-      if (previous && reading.measuredMs <= previous.measuredMs) return;
+      if (previous && reading.measuredMs <= previous.measuredMs) continue;
+      reading.socketSession=sensorSession;sensorStats.accepted++;
       readings.set(reading.deviceId, reading);
-      $('iotMessage').textContent = ''; renderSensors();
-    } catch (error) { $('iotMessage').textContent = error.message; }
+      $('iotMessage').textContent = '';
+      }
+    } catch (error) { sensorStats.rejected++;$('iotMessage').textContent = error.message; }
+    renderSensors();
   };
   socket.onerror = () => {if (current()) sensorConnectionLabel('Connection error · retrying');};
   socket.onclose = () => {
@@ -128,9 +140,11 @@ $('iotConnect').onclick = () => {
   try {url = FireTelemetry.endpoint($('iotEndpoint').value.trim(), location.protocol);}
   catch (error) {$('iotMessage').textContent = error.message; return;}
   stopSensors(); sensorURL = url; sensorWanted = true; sensorAttempts = 0;
+  sensorStats={messages:0,accepted:0,rejected:0,lastMessageMs:null};readings.clear();
   $('iotMessage').textContent = ''; saveSensorConnection(); openSensors(sensorGeneration);
 };
 $('iotDisconnect').onclick = stopSensors;
+$('iotDetected').onclick=()=>{if(detectedDevice){$('iotDeviceId').value=detectedDevice;$('iotName').value=detectedDevice;setPicking(true);$('iotMessage').textContent='Click the map to locate this real controller, then Add controller.';}};
 $('iotPick').onclick = () => setPicking(!picking());
 map.on('click', e => {
   if (window.FireSimulation?.isActive()) return;

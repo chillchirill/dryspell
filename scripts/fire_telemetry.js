@@ -61,7 +61,42 @@
     if (pageProtocol === 'https:' && url.protocol !== 'wss:') throw new Error('This HTTPS map requires a wss:// connection');
     return url.href;
   }
-  const api = {normalize, status, endpoint, deviceId, STALE_MS};
+  function createDecoder() {
+    const registry=new Map();
+    return function decode(raw,now=Date.now()) {
+      if(typeof raw==='string') {
+        if(raw.length>262144)throw new Error('Message too large');
+        try {raw=JSON.parse(raw);}catch {throw new Error('Expected JSON from the controller server');}
+      }
+      if(!object(raw))throw new Error('Expected a JSON object');
+      if(!raw.type) {const reading=normalize(raw,now);return reading?[reading]:[];}
+      // New webplatform protocol. Never treat simulated or historical contexts as live.
+      if(raw.context!=='live')return [];
+      const remember=s=>{
+        if(!object(s)||typeof s.id!=='string')return;
+        if(s.source==='real'&&!s.archived&&deviceId(s.deviceId))registry.set(s.id,s.deviceId);
+        else registry.delete(s.id);
+      };
+      const observation=r=>{
+        if(!object(r)||r.source!=='real'||r.values?.temperatureC===undefined)return null;
+        if(!registry.has(r.sensorId))throw new Error('Device registry missing; reconnect to receive a fresh snapshot');
+        if(r.quality?.some(q=>['fault','saturated','missing'].includes(q)))throw new Error('Server marked this temperature reading as faulty or missing');
+        const value=normalize({deviceId:registry.get(r.sensorId),temperatureC:r.values.temperatureC,recordedAt:r.recordedAt},now);
+        if(r.quality?.includes('server-time'))value.timeSource='server';
+        return value;
+      };
+      if(raw.type==='snapshot') {
+        if(!Array.isArray(raw.payload?.sensors)||!Array.isArray(raw.payload?.readings))throw new Error('Invalid live snapshot');
+        if(raw.payload.sensors.length>500||raw.payload.readings.length>500)throw new Error('Live snapshot exceeds 500 devices');
+        registry.clear();raw.payload.sensors.forEach(remember);
+        return raw.payload.readings.map(observation).filter(Boolean);
+      }
+      if(raw.type==='sensor.updated'){remember(raw.payload);return [];}
+      if(raw.type==='sensor.reading'){const value=observation(raw.payload);return value?[value]:[];}
+      return [];
+    };
+  }
+  const api = {normalize, createDecoder, status, endpoint, deviceId, STALE_MS};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.FireTelemetry = api;
 })(globalThis);
