@@ -12,8 +12,19 @@ const child=spawn(process.env.PYTHON_BIN||'python',[fileURLToPath(new URL('./ser
   {env:{...process.env,BACKEND_PORT:String(backendPort)},stdio:'inherit',windowsHide:true});
 const server=http.createServer((req,res)=>{
   if(!req.url.startsWith('/')||req.url.startsWith('//')){res.writeHead(400);res.end();return;}
+  const headers={...req.headers,host:'127.0.0.1:'+backendPort};
+  if(req.headers.origin){
+    let allowed=false;
+    try{
+      const origin=new URL(req.headers.origin);
+      allowed=['http:','https:'].includes(origin.protocol)&&origin.origin===req.headers.origin&&origin.host===req.headers.host;
+    }catch{}
+    if(!allowed){res.writeHead(403);res.end();return;}
+    // Validate the public origin before translating it to the private HTTP hop.
+    headers.origin='http://'+headers.host;
+  }
   const proxy=http.request({hostname:'127.0.0.1',port:backendPort,path:req.url,method:req.method,
-    headers:{...req.headers,host:'127.0.0.1:'+backendPort}},reply=>{
+    headers},reply=>{
       res.writeHead(reply.statusCode,reply.headers);reply.pipe(res);
     });
   proxy.on('error',()=>{if(!res.headersSent)res.writeHead(503,{'Content-Type':'application/json'});res.end('{"error":"Server is starting; retry shortly"}');});
