@@ -158,9 +158,14 @@ packages. Start the server, then invoke `scripts/check_dashboard_browser.cjs`
 through Python's `subprocess`. Actual captures are saved under
 `output/spread/browser_checks/`.
 
-## Two-year activity calendar
+## Harmonized activity calendar (challenge workspace)
 
-Build from the supplied handoff ZIP, then rebuild the same dashboard:
+The default dashboard view is the MODIS + VIIRS calendar. **Back to forecast**
+opens the existing probability map, spread arrows and Ireland simulation.
+`http://localhost:8000/?view=forecast` opens the forecast directly. Controllers
+remain a separate source of local temperature, not an input to harmonization.
+
+Rebuild the long calendar from the already supplied archive, then the dashboard:
 
 ```powershell
 .venv\Scripts\python.exe fire_history.py --package "C:\path\to\harmonization_handoff.zip"
@@ -168,60 +173,95 @@ Build from the supplied handoff ZIP, then rebuild the same dashboard:
 .venv\Scripts\python.exe fire_dashboard.py serve --port 8000
 ```
 
-The package stays in its original location. The builder checks its SHA256
-manifest, reads selected arrays directly from the ZIP, never runs packaged code,
-never loads pickled arrays, and does not download or unpack global archives.
-Generated JSON, monthly CSV and compressed VIIRS points stay in ignored
-`output/history/` (about 3.9 MB for the supplied package).
+There are no scientific downloads or global archive extraction. The builder
+verifies package checksums and reads selected NPZ/CSV members in memory; it never
+executes packaged code or loads pickled arrays. The supplied MODIS monthly files
+contain 302 months, November 2000 through December 2025 (15.761 MB of NPZ files).
+VIIRS extends the displayed calendar through October 2026, for **312 months**.
+November 2026 is partial and excluded, not a zero or a live observation.
 
-The **Fire history & calendar** button opens a separate map view, preserving the
-forecast and sensor controls. It covers November 2024 through October 2026 in
-Ireland (Republic), United Kingdom (including Northern Ireland), Spain and
-European France. Country and month-range controls filter the calendar and CSV;
-selecting a month displays its active grid cells. Coastal/border cells and
-territories absent from the handoff are excluded. Forecast probability cells and
-direction arrows are hidden in this historical view and restored on return.
+The four supported regions are the Republic of Ireland, United Kingdom
+(including Northern Ireland), Spain and European France. Delivered country
+boundaries are coarse; a shared mask keeps only 0.25-degree cells whose centre
+and four corners are inside a single country polygon. Border/coastal cells and
+territories absent from the handoff are excluded. This is regional coverage,
+not arbitrary AOI selection or complete national coverage.
 
-The common measure is **detected grid-cell days**: a cell observed on a day
-counts once even if several VIIRS satellites/overpasses detected it. Summing this
-measure across a country does not count independent fires or burned area.
-VIIRS is rebuilt from raw points with nominal/high confidence and type 0 where
-available. MODIS monthly counts already use confidence >=30 and type 0.
-Both use the same supplied static-source mask and 0.25-degree cells whose centre
-and four corners fall inside a delivered country polygon. The annual MODIS file
-and precomputed VIIRS climate arrays are deliberately not mixed into this series.
+### One series, explicit provenance
 
-An **experimental adjusted VIIRS index** scales country totals toward MODIS.
-A nonnegative least-squares multiplier is fitted on the first 9 common months
-(Nov 2024–Jul 2025), then evaluated on the last 5 (Aug–Dec 2025). The fitted
-multiplier is frozen; test months never determine it. The UI exposes the factor,
-held-out MAE before/after adjustment, and whether it improves this comparison.
-The fixed preprocessing mask is shared across the entire record: this is not
-prospective validation. Individual map-cell adjustment is illustrative; it has
-only been evaluated at country-total level.
+The observed measure is **detected grid-cell days**: each cell with one or more
+retained detections on a date contributes one day. VIIRS satellites/overpasses
+are unioned, not summed. MODIS was filtered upstream at confidence >=30 and type
+0; VIIRS uses nominal/high confidence and type 0 where available. Both use the
+same supplied static-source mask. Zero means no retained detections; source
+completeness and cloud-free observation coverage cannot be established.
 
-This is **monthly aggregate alignment**, not completed event-level sensor
-harmonization. MODIS raw points/times and FRP are missing. MODIS for 2026 is null,
-not zero. VIIRS NRT lacks `type` from Aug 2026; those months show unknown-type
-counts and provisional adjusted values. File-date coverage is checked for both
-VIIRS satellites, but cloud-free observation coverage and source completeness
-are unknown. Zero means no retained detections, not proof of no fire. Two years
-do not establish a climatic baseline or long-term trend.
+The main **harmonized activity** series uses the MODIS value wherever supplied,
+otherwise the adjusted VIIRS value. It never adds overlapping sensors. Adjusted
+VIIRS is a **MODIS-scale index**, not a literal number of fires, hotspots or days.
+Raw MODIS, raw VIIRS and adjusted VIIRS views remain available. The source and
+quality flags are visible for every month and exported in the monthly CSV.
 
-Additional read-only endpoints (restart an older running server after updating):
+The nonnegative country multiplier is fitted on November 2024-July 2025 and
+frozen. August-December 2025 is held out; no parameter fitting or selection uses
+these test months. The before/after chart shades the test period and reports MAE
+and signed bias. These measure satellite agreement, not fire-prediction accuracy.
+Only five held-out months are available, so year-round equivalence is unproven.
+Validation is at country-total level; scaling individual map cells is illustrative.
+The shared static mask is retrospective, not a prospective validation pipeline.
 
-- `/api/history`: the calendar and per-month grid-cell data.
-- `/api/history/detections?country=Ireland&start=2025-01&end=2025-12`: supplied raw
-  VIIRS rows for the selected country/months, with a `calendar_included` flag.
-  Raw MODIS points cannot be exported because they are not supplied.
+VIIRS NRT source type is unknown from August 2026. Its harmonized continuation
+and anomalies are marked provisional; the mask cannot guarantee removal of all
+industrial heat sources. Missing calibration or missing data produces null,
+never a fabricated zero. Pre-2003 MODIS coverage is marked separately.
 
-Monthly CSV is generated in the browser and also works in standalone HTML.
-VIIRS point downloads require the local server. Neither endpoint serves archive
-paths, source code, keys or arbitrary files.
+### Historical reference and exports
+
+For each selected month, the comparison uses the **same calendar month** in
+supplied MODIS years 2003-2023 strictly before the selected year. At least five
+reference years are required. Recent months use 21 reference years. Displayed
+values include the median, descriptive 10th-90th percentile band, absolute
+anomaly and relative anomaly. A zero median leaves the percentage unavailable.
+The selected year, future years and early coverage years are never used in its
+baseline. The overlap years 2024-2025 are outside the fixed reference pool.
+These are descriptive detection statistics, not forecast probabilities or a
+climate-trend claim; sensor and observation-coverage uncertainty remains.
+
+Calendar rows are years, columns months. Region/date/metric controls affect the
+calendar, peak-month and complete-year summaries and exports. Missing values
+are striped; provisional continuation and early coverage have separate marks.
+
+- **Monthly CSV**: selected country and dates, both instruments, harmonized
+  index, source, quality flags, reference statistics and anomalies.
+- **Calendar SVG**: a standalone vector calendar with units, provenance and legend.
+- **Validation SVG**: before/after country-level agreement with held-out months.
+- **VIIRS points CSV**: supplied points in the selected country/date range,
+  retaining `calendar_included`. Incomplete months fail the calendar inclusion
+  flag even if individual point rows are supplied. Raw MODIS points/times/FRP
+  are absent and cannot be reconstructed or exported from monthly aggregates.
+
+Read-only endpoints remain `/api/history` and
+`/api/history/detections?country=Ireland&start=2025-01&end=2025-12`.
+Monthly CSV and SVG work in the standalone map; points export requires the local
+server. Generated artifacts stay in ignored `output/history/`.
+
+### Challenge scope and remaining limitations
+
+This implements monthly aggregate harmonization and a long-record web calendar,
+regional/date selection, historical comparisons, downloadable analytics and
+visualizations. It does not claim event-level sensor matching, literal hotspot
+counts, arbitrary polygons, verified cloud coverage, or fully validated sensor
+interchangeability. These distinctions should remain visible in the presentation.
+Forecast probability, wind simulation and controller temperature are additional
+features; they do not establish the validity of harmonization.
 
 ```powershell
-.venv\Scripts\python.exe -m unittest test_fire_spread test_fire_evaluation test_fire_dashboard test_fire_history
+.venv\Scripts\python.exe -m unittest test_fire_history test_fire_dashboard
 ```
+
+Checks cover source stitching, no overlapping-sensor addition, temporal holdout,
+missing/zero values, past-only same-month baselines, export boundaries, the full
+calendar, SVG/CSV downloads and desktop/mobile navigation back to forecasts.
 
 ## Live controller temperature (WebSocket)
 

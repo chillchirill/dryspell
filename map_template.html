@@ -179,17 +179,24 @@ body:not(.dark) .spread-key { color:#6d28d9; }
 .spread-canvas { position:absolute; pointer-events:none; }
 .spread-unavailable { color:var(--hot); }
 
-.history-panel { position:absolute; z-index:1000; left:12px; top:12px; width:min(470px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:16px; box-sizing:border-box; }
+.history-panel { position:absolute; z-index:1000; left:12px; top:12px; width:min(660px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:9px; padding:16px; box-sizing:border-box; }
 .history-panel[hidden] { display:none; }
 #panel[hidden] { display:none; }
 .history-panel h2 { margin:0 0 12px; }
 .history-fields { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:12px 0; }
 .history-fields label { display:grid; gap:4px; font-size:12px; color:var(--muted); }
 .history-fields select,.history-fields input { min-width:0; width:100%; box-sizing:border-box; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:6px; }
-.history-calendar { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:12px 0; }
+.history-calendar { display:grid; grid-template-columns:42px repeat(12,minmax(38px,1fr)); gap:3px; min-width:570px; margin:8px 0; }
+.history-calendar-scroll { overflow:auto; max-height:330px; margin:12px 0; }
+.history-year,.history-month-label { font-size:11px; padding:8px 2px; text-align:center; color:var(--muted); }
+.history-month-label { position:sticky; top:0; background:var(--panel); z-index:1; }
+.history-chart { width:100%; height:auto; display:block; color:var(--fg); }
+.history-summary { font-size:13px; padding:10px; border:1px solid var(--line); border-radius:6px; }
 .history-month { color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:8px 3px; cursor:pointer; text-align:center; }
 .history-month span { display:block; font-size:11px; margin-bottom:4px; }
-.history-month strong { font-size:15px; }
+.history-month strong { font-size:10px; }
+.history-month.provisional { border-bottom:3px solid #fbbf24; }
+.history-month.early { border-bottom:3px dotted #a3a3a3; }
 .history-month[aria-pressed=true] { outline:2px solid #c084fc; outline-offset:1px; }
 .history-month.missing { background:repeating-linear-gradient(135deg,transparent,transparent 5px,#8882 5px,#8882 7px) !important; }
 .history-panel table { width:100%; margin:10px 0; font-size:12px; }
@@ -220,7 +227,7 @@ body:not(.dark) .spread-key { color:#6d28d9; }
       <div class="nav"><button class="btn" id="view-ireland">Ireland</button><button class="btn" id="view-world">World</button></div>
       <h2 style="margin-top:12px">Other views</h2>
       <div class="nav col">
-        <button class="btn" id="history-open" disabled>Fire history calendar</button>
+        <button class="btn" id="history-open" disabled>MODIS + VIIRS calendar</button>
         <button class="btn" id="simulation-open">Ireland fire simulation</button>
         <a class="btn" href="climate_map.html">Seasons and years</a>
       </div>
@@ -913,26 +920,28 @@ requestAnimationFrame(now => { last = now; frame(now); applyOverlays(); });   //
   window.FireSpreadLayer={setPayload,refresh:requestDraw,selectFeature,getState:()=>({source:ui.source.value,hour:h(),kind:ui.kind.value,
     selectedId:selected?.id||null,visibleArrows:drawn.length,featureCount:dataset()?.features.length||0,
     matchingFeatures:(dataset()?.features||[]).filter(matchesFilters).length,
-    drawn:drawn.map(d=>({id:d.feature.id,probability:probabilityAt(d.feature),bearing:direction(frameOf(d.feature))})),eligible:!!eligible()})};
+    drawn:drawn.map(d=>({id:d.feature.id,probability:probabilityAt(d.feature),bearing:direction(frameOf(d.feature))})),eligible:!!eligible(),loading,renderPending:scheduled})};
   try {const embedded=JSON.parse(el('spread-payload').textContent);for(const source of ['active','scenario','ireland','europe'])if(embedded[source])setPayload(source,embedded[source]);}catch(error){failure='Saved spread snapshot could not be read.';}
   renderList();load(ui.source.value);
 })();
 </script>
 
 <aside id="history-panel" class="history-panel" hidden aria-label="Historical fire activity">
-  <div style="display:flex;justify-content:space-between;gap:12px"><h2>Fire activity calendar</h2><button class="btn" id="history-close">Back to forecast</button></div>
-  <div class="hint">Two-year MODIS / VIIRS comparison. Historical observations, separate from the forecast.</div>
+  <div style="display:flex;justify-content:space-between;gap:12px"><h2>MODIS + VIIRS fire calendar</h2><button class="btn" id="history-close">Back to forecast</button></div>
+  <div class="hint">Long-term MODIS history continued with adjusted VIIRS. Historical activity, not a fire forecast.</div>
   <div class="history-fields">
     <label>Region<select id="history-country"></select></label>
-    <label>Display<select id="history-metric"><option value="viirs">VIIRS detected cell-days</option><option value="modis">MODIS detected cell-days</option><option value="adjusted">Adjusted VIIRS index (experimental)</option></select></label>
+    <label>Display<select id="history-metric"><option value="harmonized">Harmonized activity (MODIS scale)</option><option value="viirs">VIIRS detected cell-days</option><option value="modis">MODIS detected cell-days</option><option value="adjusted">Adjusted VIIRS index (experimental)</option></select></label>
     <label>From month<input id="history-from" type="month"></label><label>Through month<input id="history-to" type="month"></label>
   </div>
   <p id="history-status" class="hint" role="status" aria-live="polite"></p>
-  <div id="history-calendar" class="history-calendar" aria-label="Monthly fire activity"></div>
+  <div id="history-summary" class="history-summary"></div>
+  <div class="history-calendar-scroll"><div id="history-calendar" class="history-calendar" aria-label="Years by months: fire activity"></div></div>
   <div id="history-legend" class="hint"></div>
   <div id="history-detail"></div>
-  <div class="spread-actions"><button class="btn" id="history-csv">Monthly CSV</button><button class="btn" id="history-points">VIIRS points CSV</button></div>
+  <div class="spread-actions"><button class="btn" id="history-csv">Monthly CSV</button><button class="btn" id="history-image">Calendar SVG</button><button class="btn" id="history-points">VIIRS points CSV</button></div>
   <div id="history-download-status" class="hint" role="status"></div>
+  <details open><summary>Sensor agreement: before and after</summary><div id="history-validation"></div><button class="btn" id="history-validation-image">Validation SVG</button></details>
   <details><summary>Method, calibration &amp; limitations</summary><div id="history-method" class="hint"></div></details>
 </aside>
 <script type="application/json" id="history-payload">{}</script>

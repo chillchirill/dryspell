@@ -213,6 +213,8 @@ def build(refresh=False):
     history_path=ROOT/'output/history/history_latest.json'
     if history_path.exists():
         history=json.loads(history_path.read_text(encoding='utf-8'))
+        if history.get('metadata',{}).get('schema_version') != 2:
+            raise ValueError('Rebuild the supplied history cache: .venv\\Scripts\\python.exe fire_history.py --package <existing handoff ZIP>')
         html=html.replace('<script type="application/json" id="history-payload">{}</script>',
                           '<script type="application/json" id="history-payload">'+safe_json(history)+'</script>')
         history_js=(ROOT/'scripts/fire_history_ui.js').read_text(encoding='utf-8')

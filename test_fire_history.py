@@ -54,6 +54,52 @@ class HistoryTests(unittest.TestCase):
         mask[interior]=True
         self.assertEqual(history.common_grid(polygon,mask)[interior],-1)
 
+    def test_harmonized_series_does_not_add_overlapping_sensors(self):
+        rows=[{'month':'2001-01','modis':2,'viirs':None,'unknown':0},
+              {'month':'2025-01','modis':4,'viirs':20,'unknown':0},
+              {'month':'2026-01','modis':None,'viirs':20,'unknown':0},
+              {'month':'2026-08','modis':None,'viirs':20,'unknown':3},
+              {'month':'2026-09','modis':None,'viirs':None,'unknown':0}]
+        history.harmonize_records(rows,{'factor':.25,'improved_on_test':True})
+        self.assertEqual([r['harmonized'] for r in rows],[2,4,5,5,None])
+        self.assertIn('early_satellite_coverage',rows[0]['quality_flags'])
+        self.assertEqual(rows[1]['harmonized_source'],'MODIS')
+        self.assertIn('unknown_type_provisional',rows[3]['quality_flags'])
+        history.harmonize_records(rows,{'factor':None})
+        self.assertIsNone(rows[2]['harmonized'])
+        self.assertEqual(rows[1]['harmonized'],4)
+
+    def test_baseline_never_uses_target_future_or_other_seasons(self):
+        rows=[{'month':f'{year}-01','modis':10,'harmonized':10} for year in range(2001,2027)]
+        rows += [{'month':'2020-07','modis':9999,'harmonized':9999}]
+        next(r for r in rows if r['month']=='2026-01')['harmonized']=25
+        history.add_historical_comparisons(rows)
+        target=next(r for r in rows if r['month']=='2026-01')
+        self.assertEqual(target['baseline_years'],21)
+        self.assertEqual(target['baseline_median'],10)
+        self.assertEqual(target['anomaly_pct'],150)
+        self.assertEqual(target['anomaly_status'],'above_reference')
+        early=next(r for r in rows if r['month']=='2007-01')
+        self.assertIsNone(early['baseline_median'])
+        past=next(r for r in rows if r['month']=='2008-01')
+        self.assertEqual(past['baseline_years'],5)
+        for r in rows:
+            if r['month']>='2008-01':r['modis']=9999
+        history.add_historical_comparisons(rows)
+        self.assertEqual(past['baseline_median'],10)
+
+    def test_zero_baseline_and_missing_activity_do_not_invent_percentages(self):
+        rows=[{'month':f'{year}-01','modis':0,'harmonized':0} for year in range(2003,2010)]
+        rows[-1]['harmonized']=2
+        history.add_historical_comparisons(rows)
+        self.assertIsNone(rows[-1]['anomaly_pct'])
+        self.assertEqual(rows[-1]['anomaly_absolute'],2)
+        self.assertEqual(rows[-1]['anomaly_status'],'above_reference')
+        rows[-1]['harmonized']=None
+        history.add_historical_comparisons(rows)
+        self.assertEqual(rows[-1]['anomaly_status'],'unavailable')
+        self.assertIsNone(rows[-1]['anomaly_absolute'])
+
     def test_checksum_verification_rejects_changed_package(self):
         content=b'original';manifest=hashlib.sha256(content).hexdigest()+'  data/sample.txt\n'
         for value,passes in [(content,True),(b'changed',False)]:
